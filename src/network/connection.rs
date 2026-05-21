@@ -4,7 +4,7 @@
 use std::io::ErrorKind;
 use std::net::SocketAddr;
 
-use bytes::{Buf, BufMut, BytesMut};
+use bytes::{BufMut, BytesMut};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
@@ -37,55 +37,49 @@ impl Connection {
     }
 
     /// Read bytes from socket into rbuf.
+    /// allocation never expands beyond MAX_READ_BUFFER under any circumstances.
     pub async fn read(&mut self) -> Result<usize> {
-        if self.rbuf.len() >= MAX_READ_BUFFER {
+        let current_len = self.rbuf.len();
+
+        if MAX_READ_BUFFER - current_len < MIN_READ_BUFFER {
             return Err(NetworkError::BufferOverflow);
         }
 
-        let remaining = MAX_READ_BUFFER - self.rbuf.len();
-        self.rbuf.reserve(remaining.min(MIN_READ_BUFFER));
+        let available_capacity = self.rbuf.capacity() - current_len;
+        if available_capacity < MIN_READ_BUFFER {
+            self.rbuf.reserve(MIN_READ_BUFFER);
+        }
 
-        let chunk = self.rbuf.chunk_mut();
-
-        // SAFETY: chunk_mut() gives uninitialized tail of rbuf.
-        // advance_mut(n) called only with exact byte count from read().
-        let buf = unsafe { std::slice::from_raw_parts_mut(chunk.as_mut_ptr(), chunk.len()) };
-
-        match self.stream.read(buf).await {
-            Ok(0) => return Err(NetworkError::ConnectionClosed),
-            Ok(n) => {
-                unsafe {
-                    self.rbuf.advance_mut(n);
-                }
-
-                Ok(n)
-            }
-            Err(e) => {
-                return Err(match e.kind() {
-                    ErrorKind::ConnectionReset => NetworkError::ConnectionReset,
-                    ErrorKind::TimedOut => NetworkError::ConnectionTimeout,
-                    ErrorKind::WouldBlock => NetworkError::Io(e),
-                    _ => NetworkError::Io(e),
-                });
-            }
+        match self.stream.read_buf(&mut self.rbuf).await {
+            Ok(0) => Err(NetworkError::ConnectionClosed),
+            Ok(n) => Ok(n),
+            Err(e) => Err(match e.kind() {
+                ErrorKind::ConnectionReset => NetworkError::ConnectionReset,
+                ErrorKind::TimedOut => NetworkError::ConnectionTimeout,
+                ErrorKind::WouldBlock => NetworkError::Io(e),
+                _ => NetworkError::Io(e),
+            }),
         }
     }
 
     /// Writes bytes from wbuf to socket.
     pub async fn write(&mut self) -> Result<()> {
-        while !self.wbuf.is_empty() {
-            let n = self.stream.write(&self.wbuf).await?;
-
-            if n == 0 {
-                return Err(NetworkError::ConnectionClosed);
+        if !self.wbuf.is_empty() {
+            match self.stream.write_all(&self.wbuf).await {
+                Ok(_) => {
+                    self.wbuf.clear();
+                }
+                Err(e) if e.kind() == ErrorKind::WriteZero => {
+                    return Err(NetworkError::ConnectionClosed);
+                }
+                Err(e) => return Err(NetworkError::Io(e)),
             }
-
-            self.wbuf.advance(n);
         }
+
         Ok(())
     }
 
-    /// Writes bytes into wbuf(Not socket).
+    /// Writes bytes into wbuf (Not socket).
     pub fn write_buf(&mut self, data: &[u8]) -> Result<()> {
         if self.wbuf.len() + data.len() > MAX_WRITE_BUFFER {
             return Err(NetworkError::BufferOverflow);

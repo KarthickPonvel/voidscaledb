@@ -4,7 +4,7 @@
 pub mod codec;
 pub mod command;
 pub mod error;
-
+pub mod reply;
 pub mod resp2;
 
 pub use error::Result;

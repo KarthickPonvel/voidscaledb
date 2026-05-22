@@ -9,4 +9,5 @@ license = "Apache-2.0"
 socket2 = "0.6"
 thiserror = "2"
 bytes = "1"
+smallvec = "1"
 tokio = { version = "1", features = ["full"] }

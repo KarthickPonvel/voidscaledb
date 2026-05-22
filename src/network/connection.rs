@@ -11,10 +11,10 @@ use tokio::net::TcpStream;
 use crate::network::Result;
 use crate::network::error::NetworkError;
 
-pub const MIN_READ_BUFFER: usize = 32 * 1024; // 32 KB
-pub const MIN_WRITE_BUFFER: usize = 32 * 1024; // 32 KB
-pub const MAX_READ_BUFFER: usize = 32 * 1024 * 1024; // 32 MB
-pub const MAX_WRITE_BUFFER: usize = 32 * 1024 * 1024; // 32 MB
+pub const MIN_READ_BUFFER: usize = 64 * 1024; // 32 KB
+pub const MIN_WRITE_BUFFER: usize = 64 * 1024; // 32 KB
+pub const MAX_READ_BUFFER: usize = 64 * 1024 * 1024; // 32 MB
+pub const MAX_WRITE_BUFFER: usize = 64 * 1024 * 1024; // 32 MB
 
 pub struct Connection {
     stream: TcpStream,
@@ -52,7 +52,7 @@ impl Connection {
 
         match self.stream.read_buf(&mut self.rbuf).await {
             Ok(0) => Err(NetworkError::ConnectionClosed),
-            Ok(n) => Ok(n),
+            Ok(n) => Ok(n), // TODO: Implement buffer(rbuf) shrink to reclaim memory.
             Err(e) => Err(match e.kind() {
                 ErrorKind::ConnectionReset => NetworkError::ConnectionReset,
                 ErrorKind::TimedOut => NetworkError::ConnectionTimeout,
@@ -68,6 +68,7 @@ impl Connection {
             match self.stream.write_all(&self.wbuf).await {
                 Ok(_) => {
                     self.wbuf.clear();
+                    // TODO: Implement buffer(wbuf) shrink to reclaim memory.
                 }
                 Err(e) if e.kind() == ErrorKind::WriteZero => {
                     return Err(NetworkError::ConnectionClosed);

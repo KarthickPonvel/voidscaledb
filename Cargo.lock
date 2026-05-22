@@ -214,6 +214,7 @@ name = "voidscale"
 version = "0.1.0"
 dependencies = [
  "bytes",
+ "smallvec",
  "socket2",
  "thiserror",
  "tokio",

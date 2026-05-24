@@ -4,10 +4,6 @@
 use voidscale::network::server::Server;
 
 fn main() {
-    let rt = tokio::runtime::Runtime::new().unwrap();
-
-    rt.block_on(async {
-        let mut server = Server::new("127.0.0.1:9379".parse().unwrap()).unwrap();
-        server.start().await;
-    })
+    let mut server = Server::new("127.0.0.1:9379".parse().unwrap());
+    server.start();
 }

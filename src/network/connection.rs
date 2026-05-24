@@ -38,7 +38,7 @@ impl Connection {
 
     /// Read bytes from socket into rbuf.
     /// allocation never expands beyond MAX_READ_BUFFER under any circumstances.
-    pub async fn read(&mut self) -> Result<usize> {
+    pub async fn read(&mut self) -> Result<()> {
         let current_len = self.rbuf.len();
 
         if MAX_READ_BUFFER - current_len < MIN_READ_BUFFER {
@@ -52,11 +52,10 @@ impl Connection {
 
         match self.stream.read_buf(&mut self.rbuf).await {
             Ok(0) => Err(NetworkError::ConnectionClosed),
-            Ok(n) => Ok(n), // TODO: Implement buffer(rbuf) shrink to reclaim memory.
+            Ok(_) => Ok(()), // TODO: Implement buffer(rbuf) shrink to reclaim memory.
             Err(e) => Err(match e.kind() {
                 ErrorKind::ConnectionReset => NetworkError::ConnectionReset,
                 ErrorKind::TimedOut => NetworkError::ConnectionTimeout,
-                ErrorKind::WouldBlock => NetworkError::Io(e),
                 _ => NetworkError::Io(e),
             }),
         }

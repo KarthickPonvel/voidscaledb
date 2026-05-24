@@ -126,17 +126,17 @@ mod tests {
 
     #[test]
     fn test_encode_simple_string() {
-        assert_eq!(check_encode(Reply::simple("PING")), "+PING\r\n");
+        assert_eq!(check_encode(Reply::Simple("PING".into())), "+PING\r\n");
     }
 
     #[test]
     fn test_encode_bulk_string() {
-        assert_eq!(check_encode(Reply::bulk("hello")), "$5\r\nhello\r\n");
+        assert_eq!(check_encode(Reply::Bulk("hello".into())), "$5\r\nhello\r\n");
     }
 
     #[test]
     fn test_encode_bulk_string_empty() {
-        assert_eq!(check_encode(Reply::bulk("")), "$0\r\n\r\n");
+        assert_eq!(check_encode(Reply::Bulk("".into())), "$0\r\n\r\n");
     }
 
     #[test]
@@ -153,14 +153,18 @@ mod tests {
 
     #[test]
     fn test_encode_flat_array() {
-        let array = Reply::Array(vec![Reply::bulk("foo"), Reply::Integer(42), Reply::Ok]);
+        let array = Reply::Array(vec![
+            Reply::Bulk("foo".into()),
+            Reply::Integer(42),
+            Reply::Ok,
+        ]);
         assert_eq!(check_encode(array), "*3\r\n$3\r\nfoo\r\n:42\r\n+OK\r\n");
     }
 
     #[test]
     fn test_encode_nested_array() {
         let nested = Reply::Array(vec![
-            Reply::Array(vec![Reply::bulk("bar")]),
+            Reply::Array(vec![Reply::Bulk("bar".into())]),
             Reply::Integer(1),
         ]);
         assert_eq!(check_encode(nested), "*2\r\n*1\r\n$3\r\nbar\r\n:1\r\n");
@@ -168,13 +172,16 @@ mod tests {
 
     #[test]
     fn test_encode_error_unknown() {
-        assert_eq!(check_encode(Reply::unknown()), "-ERR unknown command\r\n");
+        assert_eq!(
+            check_encode(Reply::Error(CommandError::UnknownCommand)),
+            "-ERR unknown command\r\n".to_string()
+        );
     }
 
     #[test]
     fn test_encode_error_wrong_arity() {
         assert_eq!(
-            check_encode(Reply::arity()),
+            check_encode(Reply::Error(CommandError::WrongArity)),
             "-ERR wrong number of arguments\r\n"
         );
     }
@@ -182,14 +189,17 @@ mod tests {
     #[test]
     fn test_encode_error_wrong_type() {
         assert_eq!(
-            check_encode(Reply::wrong_type()),
+            check_encode(Reply::Error(CommandError::WrongType)),
             "-WRONGTYPE Operation against a key holding the wrong kind of value\r\n"
         );
     }
 
     #[test]
     fn test_encode_error_syntax() {
-        assert_eq!(check_encode(Reply::syntax()), "-ERR syntax error\r\n");
+        assert_eq!(
+            check_encode(Reply::Error(CommandError::Syntax)),
+            "-ERR syntax error\r\n"
+        );
     }
 
     #[test]
@@ -203,7 +213,9 @@ mod tests {
     #[test]
     fn test_encode_error_custom() {
         assert_eq!(
-            check_encode(Reply::err("something went wrong")),
+            check_encode(Reply::Error(CommandError::Custom(
+                b"something went wrong".to_vec().into()
+            ))),
             "-ERR something went wrong\r\n"
         );
     }
@@ -220,7 +232,7 @@ mod tests {
     #[test]
     fn test_encode_binary_safety() {
         let binary_payload = vec![0x00, 0x01, 0x02, b'\r', b'\n', 0x03];
-        let reply = Reply::bulk(binary_payload.clone());
+        let reply = Reply::Bulk(binary_payload.clone().into());
 
         let encoded = check_encode_bytes(reply);
 

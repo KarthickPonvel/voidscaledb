@@ -17,12 +17,6 @@ pub enum NetworkError {
     #[error("io error: {0}")]
     Io(#[from] std::io::Error),
 
-    #[error("failed to write to socket: {0}")]
-    WriteFailed(String),
-
-    #[error("failed to read from socket: {0}")]
-    ReadFailed(String),
-
     #[error("buffer overflow")]
     BufferOverflow,
 

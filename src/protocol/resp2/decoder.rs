@@ -93,8 +93,13 @@ pub fn decode(
                         position: 0,
                         reason: "missing frame at completion".into(),
                     })?;
+
                     let mut args = final_frame.args;
-                    let name = args.remove(0);
+                    let mut name = args.remove(0);
+
+                    let mut name_vec = name.to_vec();
+                    name_vec.make_ascii_uppercase();
+                    name = Bytes::from(name_vec);
 
                     *state = DecoderState::Idle;
                     return Ok(Some(Command::new(name, args)));
@@ -227,6 +232,14 @@ mod tests {
         let mut f = None;
         resp2::decode(&mut b, &mut s, &mut f).unwrap();
         (b, s, f)
+    }
+
+    #[test]
+    fn case_normalized_in_bulk() {
+        assert_eq!(
+            once("*1\r\n$4\r\nping\r\n").unwrap().unwrap().name_str(),
+            "PING"
+        );
     }
 
     #[test]

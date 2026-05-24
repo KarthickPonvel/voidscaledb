@@ -1,10 +1,10 @@
 // Copyright (c) 2026-present, Karthick P.
 // Licensed under the Apache License, Version 2.0.
 
-pub mod codec;
-pub mod command;
+mod affinity;
+mod dispatch;
 pub mod error;
-pub mod reply;
-pub mod resp2;
-
-use error::Result;
+mod handler;
+pub mod message;
+mod resolver;
+pub mod worker;

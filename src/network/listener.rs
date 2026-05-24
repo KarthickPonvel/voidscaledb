@@ -20,6 +20,7 @@ impl Listener {
         };
 
         let socket = socket2::Socket::new(domain, socket2::Type::STREAM, None)?;
+
         socket.set_reuse_port(true)?;
         socket.set_reuse_address(true)?;
         socket.set_nonblocking(true)?;

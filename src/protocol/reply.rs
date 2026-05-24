@@ -26,43 +26,6 @@ pub enum Reply {
     Error(CommandError),
 }
 
-impl Reply {
-    #[inline]
-    pub fn arity() -> Self {
-        Reply::Error(CommandError::WrongArity)
-    }
-
-    #[inline]
-    pub fn unknown() -> Self {
-        Reply::Error(CommandError::UnknownCommand)
-    }
-
-    #[inline]
-    pub fn err(msg: impl Into<Bytes>) -> Self {
-        Reply::Error(CommandError::Custom(msg.into()))
-    }
-
-    #[inline]
-    pub fn bulk(data: impl Into<Bytes>) -> Self {
-        Reply::Bulk(data.into())
-    }
-
-    #[inline]
-    pub fn wrong_type() -> Self {
-        Reply::Error(CommandError::WrongType)
-    }
-
-    #[inline]
-    pub fn syntax() -> Self {
-        Reply::Error(CommandError::Syntax)
-    }
-
-    #[inline]
-    pub fn simple(msg: impl Into<Bytes>) -> Self {
-        Reply::Simple(msg.into())
-    }
-}
-
 impl std::fmt::Display for CommandError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

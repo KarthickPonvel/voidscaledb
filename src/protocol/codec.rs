@@ -4,7 +4,7 @@
 use bytes::{Bytes, BytesMut};
 use smallvec::SmallVec;
 
-use crate::protocol::{Result, command::Command, resp2};
+use crate::protocol::{Result, command::Command, reply::Reply, resp2};
 
 pub enum Protocol {
     RESP2,
@@ -44,5 +44,9 @@ impl ProtocolCodec {
         }
     }
 
-    // pub fn encode(&self, buf: &mut [u8], reply: Reply) {}
+    pub fn encode(&self, buf: &mut BytesMut, reply: Reply) {
+        match self.protocol {
+            Protocol::RESP2 => resp2::encode(&reply, buf),
+        }
+    }
 }

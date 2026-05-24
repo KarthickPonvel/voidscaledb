@@ -23,6 +23,10 @@ impl Command {
         std::str::from_utf8(&self.name).unwrap_or("?")
     }
 
+    pub fn arg(&self, index: usize) -> Option<&Bytes> {
+        self.args.get(index)
+    }
+
     pub fn arg_len(&self) -> usize {
         self.args.len()
     }

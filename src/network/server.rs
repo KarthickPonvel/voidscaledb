@@ -80,21 +80,17 @@ impl Server {
 
         let local = tokio::task::LocalSet::new();
 
-        rt.block_on(async move {
+        rt.block_on(local.run_until(async move {
             let worker = match Worker::new(id, addr, rx_queue, tx_queues) {
-                Ok(worker) => worker,
+                Ok(w) => w,
                 Err(_) => {
                     eprintln!("failed to create worker-{}", id);
                     std::process::exit(1);
                 }
             };
 
-            local
-                .run_until(async move {
-                    worker.run().await;
-                })
-                .await;
-        });
+            worker.run().await;
+        }));
     }
 
     fn create_n_queues(

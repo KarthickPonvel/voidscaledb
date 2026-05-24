@@ -25,30 +25,26 @@ pub async fn handle_conn(
     let mut codec = ProtocolCodec::new();
 
     loop {
-        match conn.read().await {
-            Ok(_) => {
-                // Data in connection rbuf.
-            }
-            Err(_) => return,
+        if conn.read().await.is_err() {
+            return;
         }
+        loop {
+            let cmd = match codec.decode(conn.rbuf_mut()) {
+                Ok(Some(cmd)) => cmd,
+                Ok(None) => break,
+                Err(_) => {
+                    let err_reply = Reply::Error(CommandError::Syntax);
+                    codec.encode(conn.wbuf_mut(), err_reply);
+                    return;
+                }
+            };
+            let reply = dispatch(cmd, &resolver, &engine).await;
 
-        let cmd = match codec.decode(conn.rbuf_mut()) {
-            Ok(Some(cmd)) => cmd,
-            Ok(None) => continue,
-            Err(_) => {
-                let err_reply = Reply::Error(CommandError::Syntax);
-                codec.encode(conn.wbuf_mut(), err_reply);
-                return;
-            }
-        };
-        let reply = dispatch(cmd, &resolver, &engine).await;
-
-        codec.encode(conn.wbuf_mut(), reply);
-
-        match conn.write().await {
-            Ok(_) => {}
-            Err(_) => return,
-        };
+            codec.encode(conn.wbuf_mut(), reply);
+        }
+        if conn.write().await.is_err() {
+            return;
+        }
     }
 }
 

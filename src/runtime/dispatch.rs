@@ -30,6 +30,8 @@ pub enum Routing {
 fn get_routing_strategy(id: CommandId) -> Routing {
     match id {
         CommandId::Ping => Routing::Local,
+        CommandId::Get => Routing::FirstKey,
+        CommandId::Set => Routing::FirstKey,
     }
 }
 
@@ -49,11 +51,10 @@ pub async fn dispatch(
     let args = cmd.args;
 
     let reply = match get_routing_strategy(command_id) {
-        Routing::FirstKey => match resolver.resolve(&args[1]) {
+        Routing::FirstKey => match resolver.resolve(&args[0]) {
             Shard::Local => engine.borrow_mut().execute(command_id, args),
             Shard::Peer(tx) => {
                 let (reply_tx, reply_rx) = oneshot::channel();
-
                 tx.send(Message::new(command_id, args, reply_tx))
                     .await
                     .unwrap();

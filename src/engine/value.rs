@@ -10,9 +10,9 @@ pub enum Value {
 
 impl Value {
     #[inline]
-    pub fn as_string(&self) -> Option<&Bytes> {
+    pub fn get_bytes(&self) -> &Bytes {
         match self {
-            Value::String(b) => Some(b),
+            Value::String(b) => b,
         }
     }
 

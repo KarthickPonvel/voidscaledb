@@ -5,6 +5,8 @@
 #[repr(u8)]
 pub enum CommandId {
     Ping,
+    Set,
+    Get,
 }
 
 pub struct CommandMeta {
@@ -23,6 +25,21 @@ pub fn lookup(name: &[u8]) -> Option<CommandMeta> {
                 min: 1,
                 max: 2,
                 write: false,
+            }),
+            _ => None,
+        },
+        3 => match name {
+            b"GET" => Some(CommandMeta {
+                id: CommandId::Get,
+                min: 1,
+                max: 2,
+                write: false,
+            }),
+            b"SET" => Some(CommandMeta {
+                id: CommandId::Set,
+                min: 2,
+                max: 8,
+                write: true,
             }),
             _ => None,
         },

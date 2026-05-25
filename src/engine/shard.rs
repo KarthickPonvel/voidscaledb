@@ -6,7 +6,10 @@ use smallvec::SmallVec;
 
 use crate::{
     engine::kv::KvStore,
-    execution::{commands::server, registry::CommandId},
+    execution::{
+        commands::{server, string},
+        registry::CommandId,
+    },
     protocol::reply::Reply,
 };
 
@@ -24,6 +27,8 @@ impl ShardEngine {
     pub fn execute(&mut self, cmd_id: CommandId, args: SmallVec<[Bytes; 3]>) -> Reply {
         match cmd_id {
             CommandId::Ping => server::cmd_ping(&mut self.kv, &args),
+            CommandId::Get => string::cmd_get(&mut self.kv, &args),
+            CommandId::Set => string::cmd_set(&mut self.kv, &args),
         }
     }
 }

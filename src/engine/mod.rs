@@ -3,4 +3,4 @@
 
 pub mod kv;
 pub mod shard;
-mod value;
+pub mod value;

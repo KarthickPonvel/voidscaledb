@@ -23,7 +23,6 @@ use crate::{
 pub enum Routing {
     Local,
     FirstKey,
-    Broadcast,
 }
 
 #[inline(always)]
@@ -62,7 +61,7 @@ pub async fn dispatch(
             }
         },
         Routing::Local => engine.borrow_mut().execute(command_id, args),
-        _ => Reply::Ok, // TODO: Handle broadcast, multikey commands.
+        // TODO: Handle broadcast, multikey commands.
     };
 
     return reply;

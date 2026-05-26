@@ -3,6 +3,11 @@
 
 use voidscale::network::server::Server;
 
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
+
 fn main() {
     let mut server = Server::new("127.0.0.1:9379".parse().unwrap());
     server.start();

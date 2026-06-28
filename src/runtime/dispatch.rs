@@ -31,6 +31,8 @@ fn get_routing_strategy(id: CommandId) -> Routing {
         CommandId::Ping => Routing::Local,
         CommandId::Get => Routing::FirstKey,
         CommandId::Set => Routing::FirstKey,
+        CommandId::Ttl => Routing::FirstKey,
+        CommandId::Del => Routing::FirstKey,
     }
 }
 

@@ -23,7 +23,8 @@ impl Server {
     }
 
     pub fn start(&mut self) {
-        let cores = num_cpus::get_physical();
+        // let cores = num_cpus::get_physical(); // Multiple shard per node
+        let cores = 1; // Single shard per node
         let (tx, rx) = Self::create_n_queues(cores, 1024);
 
         self.tx_channels = tx.clone();

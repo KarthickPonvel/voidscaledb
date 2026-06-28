@@ -7,12 +7,14 @@ pub enum CommandId {
     Ping,
     Set,
     Get,
+    Del,
+    Ttl,
 }
 
 pub struct CommandMeta {
     pub id: CommandId,
     pub min: usize,
-    pub max: usize,
+    pub max: Option<usize>,
     pub write: bool,
 }
 
@@ -23,7 +25,7 @@ pub fn lookup(name: &[u8]) -> Option<CommandMeta> {
             b"PING" => Some(CommandMeta {
                 id: CommandId::Ping,
                 min: 1,
-                max: 2,
+                max: Some(2),
                 write: false,
             }),
             _ => None,
@@ -32,14 +34,26 @@ pub fn lookup(name: &[u8]) -> Option<CommandMeta> {
             b"GET" => Some(CommandMeta {
                 id: CommandId::Get,
                 min: 1,
-                max: 2,
+                max: Some(2),
                 write: false,
             }),
             b"SET" => Some(CommandMeta {
                 id: CommandId::Set,
                 min: 2,
-                max: 8,
+                max: Some(8),
                 write: true,
+            }),
+            b"DEL" => Some(CommandMeta {
+                id: CommandId::Del,
+                min: 1,
+                max: None,
+                write: true,
+            }),
+            b"TTL" => Some(CommandMeta {
+                id: CommandId::Ttl,
+                min: 1,
+                max: Some(1),
+                write: false,
             }),
             _ => None,
         },

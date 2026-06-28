@@ -17,3 +17,7 @@ core_affinity = "0.8.3"
 num_cpus = "1.17"
 mimalloc = { version = "0.1", features = ["v2"] }
 tokio = { version = "1", features = ["full"] }
+
+
+[dev-dependencies]
+redis = "0.25"

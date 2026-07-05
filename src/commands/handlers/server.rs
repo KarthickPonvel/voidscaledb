@@ -3,10 +3,10 @@
 
 use bytes::Bytes;
 
-use crate::{engine::kv::KvStore, protocol::reply::Reply};
+use crate::{engine::shard::ShardEngine, protocol::reply::Reply};
 
 #[inline]
-pub fn exec_ping(_: &mut KvStore, args: &[Bytes]) -> Reply {
+pub fn exec_ping(_: &mut ShardEngine, args: &[Bytes]) -> Reply {
     if args.len() < 1 {
         Reply::Pong
     } else {

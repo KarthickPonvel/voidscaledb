@@ -1,37 +1,25 @@
 // Copyright (c) 2026-present, Karthick P.
 // Licensed under the Apache License, Version 2.0.
 
-use std::{cell::RefCell, net::SocketAddr, rc::Rc};
-
-use tokio::task::spawn_local;
+use std::{net::SocketAddr, rc::Rc};
 
 use crate::{
-    engine::shard::ShardEngine,
-    network::{connection::Connection, listener::Listener},
-    runtime::{
-        affinity::pin_thread_to_core,
-        error::{Result, RuntimeError},
-        handler::{handle_conn, handle_inter_shard_message},
-        message::Message,
-        resolver::ShardResolver,
+    engine::{
+        coordinator::Coordinator,
+        message::{MessageRx, MessageTx},
     },
+    network::{client::Client, listener::Listener},
+    runtime::error::{Result, RuntimeError},
 };
 
 pub struct Worker {
     id: usize,
     listener: Listener,
-    rx_queue: kanal::AsyncReceiver<Message>,
-    engine: Rc<RefCell<ShardEngine>>,
-    resolver: Rc<ShardResolver>,
+    coordinator: Rc<Coordinator>,
 }
 
 impl Worker {
-    pub fn new(
-        id: usize,
-        addr: SocketAddr,
-        rx_queue: kanal::AsyncReceiver<Message>,
-        peers: Vec<kanal::AsyncSender<Message>>,
-    ) -> Result<Self> {
+    pub fn new(id: usize, addr: SocketAddr, rx: MessageRx, peers: Vec<MessageTx>) -> Result<Self> {
         let listener = match Listener::bind(addr, 128) {
             Ok(listener) => listener,
             Err(_) => {
@@ -41,48 +29,30 @@ impl Worker {
                 });
             }
         };
-
-        pin_thread_to_core(id)?;
-
-        let engine = Rc::new(RefCell::new(ShardEngine::new()));
-        let resolver = Rc::new(ShardResolver::new(id, peers));
-        Ok(Self {
+        let coordinator = Rc::new(Coordinator::new(id, rx, peers));
+        Ok(Worker {
             id,
             listener,
-            rx_queue,
-            engine,
-            resolver,
+            coordinator,
         })
     }
 
-    pub async fn run(&self) {
-        println!("Worker {} started running", self.id);
+    pub async fn run(&mut self) {
+        let coordinator_for_bus = self.coordinator.clone();
+        tokio::task::spawn_local(async move {
+            coordinator_for_bus.run().await;
+        });
         loop {
-            tokio::select! {
-                biased;
-
-
-                Ok(msg) = self.rx_queue.recv() => {
-                    let engine = self.engine.clone();
-
-                    spawn_local(async move {
-                        handle_inter_shard_message(msg, engine).await;
+            match self.listener.accept().await {
+                Ok((stream, _addr)) => {
+                    let coordinator = self.coordinator.clone();
+                    let mut client = Client::new(stream, coordinator).unwrap();
+                    // self.client.push(client);
+                    tokio::task::spawn_local(async move {
+                        client.run().await;
                     });
                 }
-
-                Ok((stream, _addr)) = self.listener.accept() => {
-                    let conn = match Connection::new(stream) {
-                        Ok(conn) => conn,
-                        Err(_) => continue,
-                    };
-
-                    let resolver = self.resolver.clone();
-                    let engine = self.engine.clone();
-
-                    spawn_local(async move {
-                        handle_conn(conn, resolver, engine).await
-                    });
-                }
+                Err(_) => {}
             }
         }
     }

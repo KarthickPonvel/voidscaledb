@@ -6,7 +6,7 @@ use std::collections::hash_map::Entry;
 use ahash::AHashMap;
 use bytes::Bytes;
 
-use crate::engine::value::Value;
+use crate::storage::value::Value;
 
 #[derive(Debug)]
 struct Record {

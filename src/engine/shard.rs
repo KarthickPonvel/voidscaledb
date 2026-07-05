@@ -7,12 +7,9 @@ use bytes::Bytes;
 use smallvec::SmallVec;
 
 use crate::{
-    engine::kv::KvStore,
-    execution::{
-        commands::{keyspace, server, string},
-        registry::CommandId,
-    },
+    commands::registry::CommandMeta,
     protocol::reply::Reply,
+    storage::{kv::KvStore, value::Value},
 };
 
 pub struct ShardEngine {
@@ -35,15 +32,9 @@ impl ShardEngine {
     }
 
     #[inline(always)]
-    pub fn execute(&mut self, cmd_id: CommandId, args: SmallVec<[Bytes; 3]>) -> Reply {
-        let now = self.update_time();
-        match cmd_id {
-            CommandId::Ping => server::exec_ping(&mut self.kv, &args),
-            CommandId::Get => string::exec_get(&mut self.kv, &args, now),
-            CommandId::Set => string::exec_set(&mut self.kv, &args, now),
-            CommandId::Del => string::exec_del(&mut self.kv, &args, now),
-            CommandId::Ttl => keyspace::exec_ttl(&mut self.kv, &args, now),
-        }
+    pub fn execute(&mut self, meta: &CommandMeta, args: SmallVec<[Bytes; 3]>) -> Reply {
+        self.update_time();
+        (meta.handler)(self, &args)
     }
 
     #[inline]
@@ -60,5 +51,29 @@ impl ShardEngine {
     #[inline]
     pub fn get_time(&self) -> u64 {
         self.current_time_ms
+    }
+
+    pub fn get_expiry(&self, key: &Bytes) -> Option<Option<u64>> {
+        self.kv.get_expiry(key)
+    }
+
+    #[inline]
+    pub fn kv_get(&mut self, key: &Bytes, now: u64) -> Option<Bytes> {
+        self.kv.get(key, now)
+    }
+
+    pub fn kv_set(
+        &mut self,
+        key: Bytes,
+        value: Value,
+        expires_at: Option<u64>,
+        keep_ttl: bool,
+    ) -> Option<Bytes> {
+        self.kv.update(key, value, expires_at, keep_ttl)
+    }
+
+    #[inline]
+    pub fn kv_del(&mut self, key: &Bytes, now: u64) -> bool {
+        self.kv.remove(key, now)
     }
 }

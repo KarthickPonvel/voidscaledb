@@ -4,18 +4,19 @@
 use bytes::Bytes;
 
 use crate::{
-    engine::kv::KvStore,
+    engine::shard::ShardEngine,
     protocol::reply::{CommandError, Reply},
 };
 
-pub fn exec_ttl(kv: &mut KvStore, args: &[Bytes], now: u64) -> Reply {
+pub fn exec_ttl(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
     if args.len() != 1 {
         return Reply::Error(CommandError::WrongArity);
     }
 
     let key = &args[0];
+    let now = shard_engine.get_time();
 
-    match kv.get_expiry(key) {
+    match shard_engine.get_expiry(key) {
         None => Reply::Integer(-2),
         Some(None) => Reply::Integer(-1),
         Some(Some(expiry)) => {

@@ -4,17 +4,19 @@
 use bytes::Bytes;
 
 use crate::{
-    engine::{kv::KvStore, value::Value},
+    engine::shard::ShardEngine,
     protocol::reply::{CommandError, Reply},
+    storage::value::Value,
 };
 
-pub fn exec_set(kv: &mut KvStore, args: &[Bytes], now: u64) -> Reply {
+pub fn exec_set(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
     if args.len() < 2 {
         return Reply::Error(CommandError::WrongArity);
     }
 
     let key = args[0].clone();
     let value = Value::String(args[1].clone());
+    let now = shard_engine.get_time();
 
     let mut nx = false;
     let mut xx = false;
@@ -65,7 +67,7 @@ pub fn exec_set(kv: &mut KvStore, args: &[Bytes], now: u64) -> Reply {
         i += 1;
     }
 
-    let old_value = kv.get(&key, now);
+    let old_value = shard_engine.kv_get(&key, now);
 
     if nx && old_value.is_some() {
         if get {
@@ -77,7 +79,7 @@ pub fn exec_set(kv: &mut KvStore, args: &[Bytes], now: u64) -> Reply {
         return Reply::Null;
     }
 
-    let old = kv.update(key, value, expiry_at, keepttl);
+    let old = shard_engine.kv_set(key, value, expiry_at, keepttl);
 
     if get {
         match old {
@@ -89,14 +91,15 @@ pub fn exec_set(kv: &mut KvStore, args: &[Bytes], now: u64) -> Reply {
     }
 }
 
-pub fn exec_get(kv: &mut KvStore, args: &[Bytes], now: u64) -> Reply {
+pub fn exec_get(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
     if args.is_empty() {
         return Reply::Error(CommandError::WrongArity);
     }
 
     let key = &args[0];
+    let now = shard_engine.get_time();
 
-    let value = match kv.get(key, now) {
+    let value = match shard_engine.kv_get(key, now) {
         Some(record) => record,
         None => return Reply::Null,
     };
@@ -104,10 +107,11 @@ pub fn exec_get(kv: &mut KvStore, args: &[Bytes], now: u64) -> Reply {
     Reply::Bulk(value.clone())
 }
 
-pub fn exec_del(kv: &mut KvStore, args: &[Bytes], now: u64) -> Reply {
+pub fn exec_del(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
     let mut count = 0;
+    let now = shard_engine.get_time();
     for key in args {
-        if kv.remove(key, now) {
+        if shard_engine.kv_del(key, now) {
             count += 1;
         }
     }

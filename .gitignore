@@ -1,3 +1,4 @@
 /target
 /plans
 .DS_Store
+benchmarks/results/

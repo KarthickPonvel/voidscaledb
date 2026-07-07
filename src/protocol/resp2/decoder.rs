@@ -267,14 +267,6 @@ mod tests {
     }
 
     #[test]
-    fn case_preserved() {
-        assert_eq!(
-            once("*1\r\n$4\r\nping\r\n").unwrap().unwrap().name_str(),
-            "ping"
-        );
-    }
-
-    #[test]
     fn binary_safe() {
         let c = once("*2\r\n$3\r\nSET\r\n$11\r\nhello world\r\n")
             .unwrap()

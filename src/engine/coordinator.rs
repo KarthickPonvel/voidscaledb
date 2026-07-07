@@ -102,12 +102,12 @@ impl Coordinator {
         };
 
         if self.outbound[worker].send(msg).await.is_err() {
-            return Reply::Error(CommandError::WrongType);
+            return Reply::Error(CommandError::Custom("Internal error".into()));
         }
 
         reply_rx
             .await
-            .unwrap_or(Reply::Error(CommandError::WrongType))
+            .unwrap_or(Reply::Error(CommandError::Custom("Internal error".into())))
     }
 
     async fn execute_multi_key(

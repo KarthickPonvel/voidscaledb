@@ -1,82 +1,66 @@
 # voidscaledb
 
-> ⚠️ **Work in progress** — not ready for production use. APIs, architecture, and implementation details may change frequently.
+> ⚠️ **Work in progress** — this isn't ready for production. Things like the API, architecture, and internals are still changing.
 
-**voidscaledb** is a personal systems programming project focused on exploring shared-nothing database architecture in Rust.
+**voidscaledb** is a personal project by an undergraduate student who's using it to learn how "shared-nothing" databases work under the hood, built in Rust.
 
-It is a RESP2-compatible in-memory database built around a shard-per-core design, where each worker owns its data and executes requests independently. Communication between workers occurs through asynchronous message passing rather than shared mutable state.
+It's a **single-node database** — all shards run as worker threads inside one process on one machine. "Shared-nothing" here describes how the shards inside that single node avoid sharing memory with each other, not a distributed, multi-machine cluster. There's no cluster management, node discovery, or cross-machine replication (yet — see "What's not built yet").
 
----
-
-## Why voidscaledb?
-
-voidscaledb began as a learning project to explore how a modern shared-nothing database can be built in Rust.
-
-The project is centered around a simple idea: each CPU core owns an independent shard containing its own data and execution engine. Rather than coordinating through shared mutable state, shards communicate through asynchronous message passing when coordination is required.
-
-Building the system from scratch provides an opportunity to study and experiment with topics such as:
-
-* Sharding and request routing
-* Network protocol implementation
-* Runtime and event-loop design
-* Concurrent systems programming
-* Memory management and allocation strategies
-* Scalability trade-offs in distributed-style architectures
-
-The long-term goal is to evolve the project beyond a simple key-value store while preserving the same shard-based execution model. Planned areas of exploration include additional data structures, persistence, JSON documents, vector indexing, and full-text search.
-
-Today, the primary focus is building a solid foundation: the runtime, networking layer, command execution path, and key-value storage engine.
+It speaks the RESP2 protocol (so you can talk to it with `redis-cli`), and it's built around a "shard-per-core" design — each CPU core runs its own independent worker that owns a slice of the data and handles requests on its own. Workers don't share memory; when they need to talk to each other, they pass messages asynchronously.
 
 ---
 
-## Architecture Philosophy
+## Why build this?
 
-The project follows several core design principles:
+voidscaledb started as a way to actually understand, hands-on, how a modern shared-nothing database gets built in Rust.
 
-* **Shared-nothing** — every shard owns its data exclusively.
+The core idea is simple: give each CPU core its own shard — its own chunk of data and its own execution engine — instead of having everything fight over shared, mutable state. When shards do need to coordinate, they send messages to each other instead.
+
+Working on this touches a lot of interesting ground:
+
+* Sharding and routing requests to the right place
+* Building a network protocol from scratch
+* Designing a runtime and event loop
+* Concurrent programming in general
+* Memory management and allocation
+* The trade-offs that come with distributed-style architectures
+
+Longer term, the plan is to grow this past a basic key-value store — while keeping the shard-based design — into something that supports more data structures, persistence, JSON documents, vector search, and full-text search.
+
+Right now, though, the focus is on the fundamentals: the runtime, the networking layer, how commands get executed, and the storage engine itself.
+
+---
+
+## Design principles
+
+* **Shared-nothing** — each shard owns its own data, full stop.
 * **Shard-per-core** — one worker thread per physical CPU core.
-* **Message-passing** — cross-shard communication occurs through asynchronous channels.
-* **Local execution** — commands execute directly on the owning shard whenever possible.
-* **Rust-first implementation** — protocol handling, execution, sharding, and runtime orchestration are implemented within this codebase.
+* **Single-node** — all shards live within one process on one machine; there's no multi-node clustering yet.
+* **Message-passing** — shards talk to each other over async channels, not shared memory.
+* **Local execution** — a command runs on the shard that owns the data whenever possible, to avoid unnecessary hops.
+* **Everything in Rust** — the protocol, execution engine, sharding logic, and runtime are all part of this codebase.
 
 ---
 
-## Features (Current)
+## What's implemented so far
 
-* RESP2 wire protocol
-* Shard-per-core architecture
-* CPU affinity pinning per worker thread
-* Per-shard Tokio runtime (`LocalSet` + `current_thread`)
-* Fast hashing via `ahash`
-* Low-latency allocation via `mimalloc`
-* Commands:
+* RESP2 protocol support
+* Shard-per-core architecture, with each worker thread pinned to a CPU core
+* A dedicated Tokio runtime per shard (`LocalSet` + `current_thread`)
+* A per-worker `Coordinator` that handles the command execution path
+* Cross-shard messaging via `crossfire` channels, with reply routing
+* Command routing based on an `ExecutionPolicy` (`Local`, `SingleKey`, `MultiKey`)
+* A fast, allocation-free command lookup table using `phf`
+* Fast hashing (`ahash`) and a low-latency allocator (`mimalloc`)
+* Commands: `PING`, `GET`, `SET` (with `NX`, `XX`, `GET`, `EX`, `PX`, `EXAT`, `PXAT`, `KEEPTTL`), `DEL`, and TTL/expiry
 
-  * `PING`
-  * `GET`
-  * `SET`
-
----
-
-## Current Status
-
-The project is currently focused on validating the core architecture and execution model.
-
-Implemented:
-
-* Basic networking layer
-* RESP2 protocol parsing
-* Shard-local key-value storage
-* Cross-shard request routing
-* Multi-worker execution model
-* Benchmarking infrastructure
-
-Not yet implemented:
+## What's not built yet
 
 * Persistence
 * Replication
 * Transactions
 * Cluster management
-* Advanced data structures
+* More advanced data structures
 * JSON support
 * Vector search
 * Full-text search
@@ -85,29 +69,13 @@ Not yet implemented:
 
 ## Benchmarks
 
-> Benchmark results are intended to track project progress and identify bottlenecks. They should not be interpreted as definitive performance comparisons.
+voidscaledb has been benchmarked against Redis 8 across 8 different workloads, both with sharding on and off, on two different machines. Short version: it's roughly on par with Redis 8 on most single-request workloads, pulls ahead under pipelining and high concurrency, and falls behind at very low concurrency where there's no parallelism for sharding to exploit. Redis also tends to hold onto a tail-latency (P99) edge in most scenarios.
 
-### Test Environment
+### macOS (Apple M4)
 
-* Apple M4
-* macOS
-* In-memory only
-* 50 concurrent clients
-* 1,000,000 requests
+Test environment: Apple M4, macOS, in-memory only, 50 concurrent clients, 1,000,000 requests. Redis 8 run with `redis-server --save "" --appendonly no` to keep the comparison fair.
 
-### Redis Configuration
-
-```bash
-redis-server --save "" --appendonly no
-```
-
-Persistence was disabled to ensure a fair comparison against the current in-memory implementation of voidscaledb.
-
-### Non-Pipelined Workload
-
-```bash
-redis-benchmark -t get,set -n 1000000 -c 50
-```
+**Non-pipelined workload** (`redis-benchmark -t get,set -n 1000000 -c 50`)
 
 | System                     | Operation |  Throughput | Avg Latency |      P50 |      P95 |      P99 |
 | -------------------------- | --------- | ----------: | ----------: | -------: | -------: | -------: |
@@ -118,11 +86,7 @@ redis-benchmark -t get,set -n 1000000 -c 50
 | voidscaledb (multi shard)  | SET       | ~252K req/s |    0.114 ms | 0.103 ms | 0.119 ms | 0.316 ms |
 | voidscaledb (multi shard)  | GET       | ~250K req/s |    0.115 ms | 0.103 ms | 0.119 ms | 0.236 ms |
 
-### Pipelined Workload (`-P 16`)
-
-```bash
-redis-benchmark -t get,set -n 1000000 -c 50 -P 16
-```
+**Pipelined workload** (`redis-benchmark -t get,set -n 1000000 -c 50 -P 16`)
 
 | System                     | Operation |   Throughput | Avg Latency |      P50 |      P95 |      P99 |
 | -------------------------- | --------- | -----------: | ----------: | -------: | -------: | -------: |
@@ -133,49 +97,11 @@ redis-benchmark -t get,set -n 1000000 -c 50 -P 16
 | voidscaledb (multi shard)  | SET       | ~1.87M req/s |    0.415 ms | 0.319 ms | 1.663 ms | 1.733 ms |
 | voidscaledb (multi shard)  | GET       | ~1.87M req/s |    0.415 ms | 0.319 ms | 1.661 ms | 1.731 ms |
 
----
+> On the M4, single-shard voidscaledb is roughly at parity with Redis 8 for both workloads (and pulls ahead under pipelining), while multi-shard is a bit behind on this particular machine — the opposite of what shows up on Linux below, which is a good reminder that these numbers depend a lot on the hardware.
 
-## Roadmap
+### Linux
 
-### Runtime & Scalability
-
-* Optimize cross-shard communication
-* Reduce message-passing overhead
-* Improve multi-shard throughput scaling
-* Add profiling and benchmark automation
-
-### Commands & Protocol
-
-* DEL
-* MGET
-* MSET
-* INCR
-* APPEND
-* TTL and expiry support
-* Additional RESP compatibility improvements
-
-### Data Structures
-
-* Lists
-* Sets
-* Sorted sets
-* Hashes
-* Streams
-* Probabilistic data structures
-
-### Storage
-
-* Write-ahead log (WAL)
-* Crash recovery
-* LSM-based persistence
-* Multi-tier storage
-
-### Multi-Model Exploration
-
-* JSON documents
-* Vector indexing
-* Approximate nearest-neighbor search
-* Full-text search
+Full numbers, test setup, and methodology for the Linux runs (HP Victus laptop, Intel i5-12450H) are in **[BENCHMARKS.md](./BENCHMARKS.md)**. On that machine, multi-shard voidscaledb pulls ahead of Redis 8 on pipelined and high-concurrency workloads (up to +30%), runs roughly neck-and-neck on most single-request workloads, and falls behind at low concurrency, where there's no parallelism for sharding to take advantage of.
 
 ---
 
@@ -193,34 +119,36 @@ redis-benchmark -t get,set -n 1000000 -c 50 -P 16
    │  Worker 0   │               │  Worker 1    │               │  Worker N    │
    │  (core 0)   │               │  (core 1)    │               │  (core N)    │
    │ Listener    │               │ Listener     │               │ Listener     │
+   │ Coordinator │               │ Coordinator  │               │ Coordinator  │
    │ ShardEngine │               │ ShardEngine  │               │ ShardEngine  │
    └──────┬──────┘               └──────┬───────┘               └──────┬───────┘
           │                             │                              │
           └──────────────┬──────────────┴──────────────┬───────────────┘
                          │                             │
                  ┌───────▼─────────────────────────────▼─────────┐
-                 │         Async Message-Passing Layer           │
+                 │      Async Message-Passing Layer (crossfire)  │
                  │     cross-shard routing + worker channels     │
                  └───────────────────────────────────────────────┘
 ```
 
-Each worker:
+Here's what each worker does:
 
-1. Binds to the same TCP address using `SO_REUSEPORT`
-2. Runs a single-threaded Tokio runtime pinned to a physical CPU core
-3. Handles connections and executes commands against its local shard
-4. Routes cross-shard requests to the owning worker via async channels
+1. Binds to the same TCP address as every other worker, using `SO_REUSEPORT`
+2. Runs its own single-threaded Tokio runtime, pinned to one physical CPU core
+3. Owns a `Coordinator` (shared via `Rc`) that reads, decodes, runs, and encodes each client request
+4. Runs commands locally on its own shard whenever the `ExecutionPolicy` allows it
+5. For anything that touches another shard (`SingleKey` / `MultiKey` policies), routes the request over `crossfire` channels and waits for a reply
 
 ---
 
-## Getting Started
+## Getting started
 
-### Requirements
+### You'll need
 
 * Rust 1.85+
 * Edition 2024
 
-### Build
+### Build and run
 
 ```bash
 git clone https://github.com/karthickponvel/voidscaledb
@@ -228,9 +156,9 @@ cd voidscaledb
 cargo run --release
 ```
 
-The server starts on `127.0.0.1:9379` by default.
+By default the server listens on `127.0.0.1:9379`.
 
-### Example
+### Try it out
 
 ```bash
 redis-cli -p 9379 ping
@@ -241,6 +169,18 @@ redis-cli -p 9379 set hello world
 
 redis-cli -p 9379 get hello
 # "world"
+
+redis-cli -p 9379 set hello everyone NX
+# (nil)
+
+redis-cli -p 9379 set session:1 abc123 EX 60
+# OK
+
+redis-cli -p 9379 ttl session:1
+# (integer) 60
+
+redis-cli -p 9379 del hello
+# (integer) 1
 ```
 
 ---

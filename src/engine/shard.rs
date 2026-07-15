@@ -65,6 +65,10 @@ impl ShardEngine {
         self.storage.str_set(key, value, options, self.get_time())
     }
 
+    pub fn str_incr_decr_by(&mut self, key: Bytes, by: i64) -> StorageResult<i64> {
+        self.storage.str_incr_decr_by(key, by, self.get_time())
+    }
+
     pub fn del(&mut self, key: &Bytes) -> bool {
         let now = self.get_time();
         self.storage.del(key, now)

@@ -363,3 +363,93 @@ fn syntax_error() {
 
     assert!(res.is_err());
 }
+
+#[test]
+fn incr_basic() {
+    let mut con = connect();
+    let k = key("incr");
+
+    let r1: i64 = redis::cmd("INCR").arg(&k).query(&mut con).unwrap();
+    assert_eq!(r1, 1);
+
+    let r2: i64 = redis::cmd("INCR").arg(&k).query(&mut con).unwrap();
+    assert_eq!(r2, 2);
+
+    assert_eq!(get(&mut con, &k), Some("2".into()));
+}
+
+#[test]
+fn decr_basic() {
+    let mut con = connect();
+    let k = key("decr");
+
+    let r1: i64 = redis::cmd("DECR").arg(&k).query(&mut con).unwrap();
+    assert_eq!(r1, -1);
+
+    let r2: i64 = redis::cmd("DECR").arg(&k).query(&mut con).unwrap();
+    assert_eq!(r2, -2);
+
+    assert_eq!(get(&mut con, &k), Some("-2".into()));
+}
+
+#[test]
+fn incrby_decrby() {
+    let mut con = connect();
+    let k = key("by");
+
+    let r1: i64 = redis::cmd("INCRBY")
+        .arg(&k)
+        .arg(10)
+        .query(&mut con)
+        .unwrap();
+    assert_eq!(r1, 10);
+
+    let r2: i64 = redis::cmd("DECRBY").arg(&k).arg(3).query(&mut con).unwrap();
+    assert_eq!(r2, 7);
+
+    assert_eq!(get(&mut con, &k), Some("7".into()));
+}
+
+#[test]
+fn incr_decr_errors() {
+    let mut con = connect();
+    let k = key("err");
+
+    set(&mut con, &k, "not_an_int");
+
+    let r1: redis::RedisResult<i64> = redis::cmd("INCR").arg(&k).query(&mut con);
+    assert!(r1.is_err());
+
+    let r2: redis::RedisResult<i64> = redis::cmd("DECR").arg(&k).query(&mut con);
+    assert!(r2.is_err());
+}
+
+#[test]
+fn incr_decr_on_expired_key() {
+    let mut con = connect();
+    let k = key("exp");
+
+    redis::cmd("SET")
+        .arg(&k)
+        .arg("10")
+        .arg("EX")
+        .arg(1)
+        .query::<()>(&mut con)
+        .unwrap();
+
+    thread::sleep(Duration::from_secs(2));
+
+    let r: i64 = redis::cmd("INCR").arg(&k).query(&mut con).unwrap();
+    assert_eq!(r, 1);
+}
+
+#[test]
+fn incr_bounds_overflow() {
+    let mut con = connect();
+    let k = key("overflow");
+
+    set(&mut con, &k, &i64::MAX.to_string());
+
+    let r: redis::RedisResult<i64> = redis::cmd("INCR").arg(&k).query(&mut con);
+    assert!(r.is_err());
+}

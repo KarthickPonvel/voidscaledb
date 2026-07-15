@@ -8,7 +8,9 @@ use crate::{
     commands::handlers::{
         key::{exec_del, exec_exists, exec_ttl},
         server::exec_ping,
-        string::{exec_get, exec_set},
+        string::{
+            exec_get, exec_set, exec_str_decr, exec_str_decr_by, exec_str_incr, exec_str_incr_by,
+        },
     },
     engine::shard::ShardEngine,
     protocol::reply::Reply,
@@ -25,6 +27,10 @@ pub enum CommandId {
     Del,
     Ttl,
     Exists,
+    Incr,
+    Decr,
+    Incrby,
+    Decrby,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,9 +73,15 @@ impl CommandMeta {
 
 pub static COMMANDS_TABLE: phf::Map<&'static [u8], CommandMeta> = phf_map! {
     b"PING" => CommandMeta::new(CommandId::Ping, 1, Some(2), false, exec_ping, ExecutionPolicy::Local),
+
     b"GET"  => CommandMeta::new(CommandId::Get, 1, Some(1), false, exec_get, ExecutionPolicy::SingleKey),
     b"SET"  => CommandMeta::new(CommandId::Set, 2, Some(8), true, exec_set, ExecutionPolicy::SingleKey),
+    b"INCR"  => CommandMeta::new(CommandId::Incr, 1, Some(1), true, exec_str_incr, ExecutionPolicy::SingleKey),
+    b"DECR"  => CommandMeta::new(CommandId::Decr, 1, Some(1), true, exec_str_decr, ExecutionPolicy::SingleKey),
+    b"INCRBY"  => CommandMeta::new(CommandId::Incrby, 2, Some(2), true, exec_str_incr_by, ExecutionPolicy::SingleKey),
+    b"DECRBY"  => CommandMeta::new(CommandId::Decrby, 2, Some(2), true, exec_str_decr_by, ExecutionPolicy::SingleKey),
+
     b"DEL"  => CommandMeta::new(CommandId::Del, 1, None, true, exec_del, ExecutionPolicy::MultiKey),
     b"EXISTS"  => CommandMeta::new(CommandId::Exists, 1, None, false, exec_exists, ExecutionPolicy::MultiKey),
-    b"TTL"  => CommandMeta::new(CommandId::Ttl, 1, Some(1), false, exec_ttl, ExecutionPolicy::SingleKey),
+    b"TTL"  => CommandMeta::new(CommandId::Ttl, 1, Some(1), false, exec_ttl, ExecutionPolicy::SingleKey)
 };

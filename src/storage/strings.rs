@@ -7,7 +7,11 @@ use bytes::Bytes;
 
 use crate::{
     commands::options::SetOptions,
-    storage::{StorageEngine, WriteOutcome, error::StorageResult, record::Record, value::Value},
+    storage::{
+        StorageEngine, StorageError, WriteOutcome, error::StorageResult, record::Record,
+        value::Value,
+    },
+    util::{bytes_to_i64, i64_to_bytes},
 };
 
 impl StorageEngine {
@@ -62,6 +66,38 @@ impl StorageEngine {
                 record.expire_at = expire_at;
 
                 Ok(WriteOutcome::Applied(Some(old)))
+            }
+        }
+    }
+
+    pub fn str_incr_decr_by(&mut self, key: Bytes, by: i64, now: u64) -> StorageResult<i64> {
+        match self.keyspace.entry(key) {
+            Entry::Vacant(v) => {
+                v.insert(Record::new(Value::String(i64_to_bytes(by)), None));
+                Ok(by)
+            }
+            Entry::Occupied(mut o) => {
+                if o.get().is_expired(now) {
+                    o.insert(Record::new(Value::String(i64_to_bytes(by)), None));
+                    return Ok(by);
+                }
+                let record = o.get_mut();
+
+                let old_val = record.value.as_string()?;
+
+                let old_int = match bytes_to_i64(old_val) {
+                    Some(val) => val,
+                    None => return Err(StorageError::OutOfRange),
+                };
+
+                let new_int = match old_int.checked_add(by) {
+                    Some(val) => val,
+                    None => return Err(StorageError::OutOfRange),
+                };
+
+                record.value = Value::String(i64_to_bytes(new_int));
+
+                return Ok(new_int);
             }
         }
     }

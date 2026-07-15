@@ -8,6 +8,7 @@ use crate::{
     engine::shard::ShardEngine,
     protocol::reply::{CommandError, Reply},
     storage::{Value, WriteOutcome},
+    util::{bytes_to_i64, bytes_to_u64},
 };
 
 pub fn exec_set(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {
@@ -44,7 +45,7 @@ pub fn exec_set(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {
             if i + 1 >= args.len() {
                 return Reply::Error(CommandError::Syntax);
             }
-            let val = match parse_u64(&args[i + 1]) {
+            let val = match bytes_to_u64(&args[i + 1]) {
                 Some(v) => v,
                 None => return Reply::Error(CommandError::OutOfRange),
             };
@@ -99,6 +100,53 @@ pub fn exec_get(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {
     }
 }
 
-fn parse_u64(arg: &Bytes) -> Option<u64> {
-    str::from_utf8(arg).ok().and_then(|s| s.parse::<u64>().ok())
+pub fn exec_str_incr(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {
+    if args.is_empty() {
+        return Reply::Error(CommandError::WrongArity);
+    }
+    incr_decr_by(shard, &args[0], 1)
+}
+
+pub fn exec_str_decr(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {
+    if args.is_empty() {
+        return Reply::Error(CommandError::WrongArity);
+    }
+    incr_decr_by(shard, &args[0], -1)
+}
+
+pub fn exec_str_incr_by(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {
+    if args.len() < 2 {
+        return Reply::Error(CommandError::WrongArity);
+    }
+
+    let by = match bytes_to_i64(&args[1]) {
+        Some(by) => by,
+        None => return Reply::Error(CommandError::OutOfRange),
+    };
+
+    incr_decr_by(shard, &args[0], by)
+}
+
+pub fn exec_str_decr_by(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {
+    if args.len() < 2 {
+        return Reply::Error(CommandError::WrongArity);
+    }
+
+    let by = match bytes_to_i64(&args[1]) {
+        Some(by) => by,
+        None => return Reply::Error(CommandError::OutOfRange),
+    };
+
+    let Some(neg_by) = by.checked_neg() else {
+        return Reply::Error(CommandError::OutOfRange);
+    };
+
+    incr_decr_by(shard, &args[0], neg_by)
+}
+
+fn incr_decr_by(shard: &mut ShardEngine, key: &Bytes, by: i64) -> Reply {
+    match shard.str_incr_decr_by(key.clone(), by) {
+        Ok(val) => Reply::Integer(val),
+        Err(e) => Reply::Error(e.into()),
+    }
 }

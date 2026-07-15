@@ -6,7 +6,7 @@ use std::{net::SocketAddr, thread::JoinHandle};
 use crate::{
     engine::message::{Message, MessageRx, MessageTx},
     runtime::{
-        error::{Result, RuntimeError},
+        error::{RuntimeError, RuntimeResult},
         worker::Worker,
     },
 };
@@ -18,7 +18,7 @@ pub struct Runtime {
 }
 
 struct WorkerHandle {
-    id: usize,
+    _id: usize,
     handle: JoinHandle<()>,
 }
 
@@ -96,14 +96,17 @@ impl Runtime {
         runtime
     }
 
-    fn pin_thread_to_core(core_id: usize) -> Result<()> {
+    fn pin_thread_to_core(core_id: usize) -> RuntimeResult<()> {
         match core_affinity::get_core_ids() {
             Some(ids) if !ids.is_empty() => {
                 let core = ids[core_id % ids.len()];
                 core_affinity::set_for_current(core);
                 Ok(())
             }
-            _ => Err(RuntimeError::ThreadPinFailed { id: core_id }),
+            _ => Err(RuntimeError::ThreadPinFailed {
+                id: core_id,
+                core: core_id,
+            }),
         }
     }
 
@@ -126,6 +129,6 @@ impl Runtime {
 
 impl WorkerHandle {
     pub fn new(id: usize, handle: JoinHandle<()>) -> Self {
-        Self { id, handle }
+        Self { _id: id, handle }
     }
 }

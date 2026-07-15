@@ -6,9 +6,9 @@ use phf::phf_map;
 
 use crate::{
     commands::handlers::{
-        keyspace::exec_ttl,
+        key::{exec_del, exec_ttl},
         server::exec_ping,
-        string::{exec_del, exec_get, exec_set},
+        string::{exec_get, exec_set},
     },
     engine::shard::ShardEngine,
     protocol::reply::Reply,

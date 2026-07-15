@@ -5,11 +5,11 @@ use thiserror::Error;
 
 #[derive(Debug, Error)]
 pub enum RuntimeError {
-    #[error("Worker {id} failed to start: {reason}")]
+    #[error("worker {id} failed to start: {reason}")]
     WorkerStartFailed { id: usize, reason: String },
 
-    #[error("worker thread {id} failed to pin to core")]
-    ThreadPinFailed { id: usize },
+    #[error("worker {id} failed to pin to core {core}")]
+    ThreadPinFailed { id: usize, core: usize },
 }
 
-pub type Result<T> = std::result::Result<T, RuntimeError>;
+pub type RuntimeResult<T> = std::result::Result<T, RuntimeError>;

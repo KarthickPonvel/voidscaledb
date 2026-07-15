@@ -7,26 +7,26 @@ use bytes::Bytes;
 use smallvec::SmallVec;
 
 use crate::{
-    commands::registry::CommandMeta,
+    commands::{options::SetOptions, registry::CommandMeta},
     protocol::reply::Reply,
-    storage::{kv::KvStore, value::Value},
+    storage::{StorageEngine, StorageResult, Value, WriteOutcome},
 };
 
 pub struct ShardEngine {
-    kv: KvStore,
+    storage: StorageEngine,
     current_time_ms: u64,
 }
 
 impl ShardEngine {
     pub fn new() -> Self {
-        let kv = KvStore::new();
+        let storage = StorageEngine::new();
         let current_time_ms = SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
 
         Self {
-            kv,
+            storage,
             current_time_ms,
         }
     }
@@ -37,7 +37,6 @@ impl ShardEngine {
         (meta.handler)(self, &args)
     }
 
-    #[inline]
     pub fn update_time(&mut self) -> u64 {
         let now = SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -48,32 +47,31 @@ impl ShardEngine {
         self.current_time_ms
     }
 
-    #[inline]
     pub fn get_time(&self) -> u64 {
         self.current_time_ms
     }
 
-    pub fn get_expiry(&self, key: &Bytes) -> Option<Option<u64>> {
-        self.kv.get_expiry(key)
+    pub fn str_get(&mut self, key: &Bytes) -> StorageResult<Option<Bytes>> {
+        let now = self.get_time();
+        self.storage.str_get(key, now)
     }
 
-    #[inline]
-    pub fn kv_get(&mut self, key: &Bytes, now: u64) -> Option<Bytes> {
-        self.kv.get(key, now)
-    }
-
-    pub fn kv_set(
+    pub fn str_set(
         &mut self,
         key: Bytes,
         value: Value,
-        expires_at: Option<u64>,
-        keep_ttl: bool,
-    ) -> Option<Bytes> {
-        self.kv.update(key, value, expires_at, keep_ttl)
+        options: SetOptions,
+    ) -> StorageResult<WriteOutcome<Option<Bytes>>> {
+        self.storage.str_set(key, value, options, self.get_time())
     }
 
-    #[inline]
-    pub fn kv_del(&mut self, key: &Bytes, now: u64) -> bool {
-        self.kv.remove(key, now)
+    pub fn del(&mut self, key: &Bytes) -> bool {
+        let now = self.get_time();
+        self.storage.del(key, now)
+    }
+
+    pub fn ttl(&mut self, key: &Bytes) -> Option<Option<u64>> {
+        let now = self.current_time_ms;
+        self.storage.ttl(key, now)
     }
 }

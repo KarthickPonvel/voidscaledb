@@ -4,44 +4,41 @@
 use bytes::Bytes;
 
 use crate::{
+    commands::options::SetOptions,
     engine::shard::ShardEngine,
     protocol::reply::{CommandError, Reply},
-    storage::value::Value,
+    storage::{Value, WriteOutcome},
 };
 
-pub fn exec_set(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
+pub fn exec_set(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {
     if args.len() < 2 {
         return Reply::Error(CommandError::WrongArity);
     }
 
     let key = args[0].clone();
     let value = Value::String(args[1].clone());
-    let now = shard_engine.get_time();
+    let now = shard.get_time();
 
-    let mut nx = false;
-    let mut xx = false;
+    let mut options = SetOptions::default();
     let mut get = false;
-    let mut keepttl = false;
-    let mut expiry_at: Option<u64> = None;
 
     let mut i = 2;
     while i < args.len() {
         let arg = args[i].as_ref();
 
         if arg.eq_ignore_ascii_case(b"NX") {
-            nx = true;
+            options.nx = true;
         } else if arg.eq_ignore_ascii_case(b"XX") {
-            xx = true;
+            options.xx = true;
         } else if arg.eq_ignore_ascii_case(b"GET") {
             get = true;
         } else if arg.eq_ignore_ascii_case(b"KEEPTTL") {
-            keepttl = true;
-        } else {
-            if keepttl {
+            if options.expires_at.is_some() {
                 return Reply::Error(CommandError::Syntax);
             }
-
-            if expiry_at.is_some() {
+            options.keep_ttl = true;
+        } else {
+            if options.keep_ttl || options.expires_at.is_some() {
                 return Reply::Error(CommandError::Syntax);
             }
             if i + 1 >= args.len() {
@@ -51,71 +48,55 @@ pub fn exec_set(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
                 Some(v) => v,
                 None => return Reply::Error(CommandError::OutOfRange),
             };
-            if arg.eq_ignore_ascii_case(b"EX") {
-                expiry_at = Some(now + (val * 1000));
+            options.expires_at = Some(if arg.eq_ignore_ascii_case(b"EX") {
+                now + val * 1000
             } else if arg.eq_ignore_ascii_case(b"PX") {
-                expiry_at = Some(now + val);
+                now + val
             } else if arg.eq_ignore_ascii_case(b"EXAT") {
-                expiry_at = Some(val * 1000);
+                val * 1000
             } else if arg.eq_ignore_ascii_case(b"PXAT") {
-                expiry_at = Some(val);
+                val
             } else {
                 return Reply::Error(CommandError::Syntax);
-            }
+            });
             i += 1;
         }
         i += 1;
     }
 
-    let old_value = shard_engine.kv_get(&key, now);
-
-    if nx && old_value.is_some() {
-        if get {
-            return Reply::Bulk(old_value.unwrap());
-        }
-        return Reply::Null;
-    }
-    if xx && !old_value.is_some() {
-        return Reply::Null;
+    if options.nx && options.xx {
+        return Reply::Error(CommandError::Syntax);
     }
 
-    let old = shard_engine.kv_set(key, value, expiry_at, keepttl);
-
-    if get {
-        match old {
-            Some(v) => Reply::Bulk(v),
-            None => Reply::Null,
+    match shard.str_set(key, value, options) {
+        Ok(WriteOutcome::Applied(old)) => {
+            if get {
+                old.map_or(Reply::Null, Reply::Bulk)
+            } else {
+                Reply::Ok
+            }
         }
-    } else {
-        Reply::Ok
+        Ok(WriteOutcome::Rejected(old)) => {
+            if get {
+                old.map_or(Reply::Null, Reply::Bulk)
+            } else {
+                Reply::Null
+            }
+        }
+        Err(e) => Reply::Error(e.into()),
     }
 }
 
-pub fn exec_get(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
+pub fn exec_get(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {
     if args.is_empty() {
         return Reply::Error(CommandError::WrongArity);
     }
-
     let key = &args[0];
-    let now = shard_engine.get_time();
-
-    let value = match shard_engine.kv_get(key, now) {
-        Some(record) => record,
-        None => return Reply::Null,
-    };
-
-    Reply::Bulk(value.clone())
-}
-
-pub fn exec_del(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
-    let mut count = 0;
-    let now = shard_engine.get_time();
-    for key in args {
-        if shard_engine.kv_del(key, now) {
-            count += 1;
-        }
+    match shard.str_get(key) {
+        Ok(Some(v)) => Reply::Bulk(v),
+        Ok(None) => Reply::Null,
+        Err(e) => Reply::Error(e.into()),
     }
-    Reply::Integer(count as i64)
 }
 
 fn parse_u64(arg: &Bytes) -> Option<u64> {

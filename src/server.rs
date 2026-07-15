@@ -6,14 +6,14 @@ use std::net::SocketAddr;
 use crate::runtime::runtime::Runtime;
 
 pub struct Server {
-    addr: SocketAddr,
+    _addr: SocketAddr,
     runtime: Runtime,
 }
 
 impl Server {
     pub fn new(addr: SocketAddr) -> Self {
         Self {
-            addr,
+            _addr: addr,
             runtime: Runtime::new(addr),
         }
     }

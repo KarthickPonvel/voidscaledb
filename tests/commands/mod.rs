@@ -1,2 +1,2 @@
-mod keyspace;
+mod key;
 mod string;

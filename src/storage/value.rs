@@ -3,23 +3,35 @@
 
 use bytes::Bytes;
 
+use crate::storage::{StorageResult, error::StorageError};
+
 #[derive(Debug, Clone)]
 pub enum Value {
     String(Bytes),
+    Hash,
 }
 
 impl Value {
-    #[inline]
-    pub fn get_bytes(&self) -> &Bytes {
+    pub fn type_name(&self) -> &'static str {
         match self {
-            Value::String(b) => b,
+            Self::String(_) => "string",
+            Self::Hash => "hash",
         }
     }
 
-    #[inline]
-    pub fn type_name(&self) -> &'static str {
-        match self {
-            Value::String(_) => "string",
+    pub fn as_string(&self) -> StorageResult<&Bytes> {
+        if let Value::String(bytes) = self {
+            Ok(bytes)
+        } else {
+            Err(StorageError::WrongType)
+        }
+    }
+
+    pub fn as_string_mut(&mut self) -> StorageResult<&mut Bytes> {
+        if let Value::String(bytes) = self {
+            Ok(bytes)
+        } else {
+            Err(StorageError::WrongType)
         }
     }
 }

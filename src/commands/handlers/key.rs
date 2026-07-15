@@ -14,19 +14,25 @@ pub fn exec_ttl(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
     }
 
     let key = &args[0];
-    let now = shard_engine.get_time();
-
-    match shard_engine.get_expiry(key) {
+    match shard_engine.ttl(key) {
         None => Reply::Integer(-2),
         Some(None) => Reply::Integer(-1),
-        Some(Some(expiry)) => {
-            if expiry <= now {
-                Reply::Integer(-2)
-            } else {
-                let rem_ms = expiry.saturating_sub(now);
-                let rem_secs = (rem_ms + 999) / 1000;
-                Reply::Integer(rem_secs as i64)
-            }
+        Some(Some(ms)) => {
+            let secs = (ms + 500) / 1000;
+            Reply::Integer(secs as i64)
         }
     }
+}
+
+pub fn exec_del(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {
+    if args.is_empty() {
+        return Reply::Error(CommandError::WrongArity);
+    }
+    let mut count = 0;
+    for key in args {
+        if shard.del(key) {
+            count += 1;
+        }
+    }
+    Reply::Integer(count as i64)
 }

@@ -3,6 +3,8 @@
 
 use bytes::Bytes;
 
+use crate::storage::StorageError;
+
 #[derive(Debug, Clone)]
 pub enum CommandError {
     UnknownCommand,
@@ -38,6 +40,15 @@ impl std::fmt::Display for CommandError {
             Self::Syntax => write!(f, "ERR syntax error"),
             Self::OutOfRange => write!(f, "ERR value out of range"),
             Self::Custom(msg) => write!(f, "ERR {}", String::from_utf8_lossy(msg)),
+        }
+    }
+}
+
+impl From<StorageError> for CommandError {
+    fn from(err: StorageError) -> Self {
+        match err {
+            StorageError::WrongType => CommandError::WrongType,
+            StorageError::OutOfRange => CommandError::OutOfRange,
         }
     }
 }

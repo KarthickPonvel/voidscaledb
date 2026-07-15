@@ -9,29 +9,30 @@ use crate::{
         message::{MessageRx, MessageTx},
     },
     network::{client::Client, listener::Listener},
-    runtime::error::{Result, RuntimeError},
+    runtime::error::{RuntimeError, RuntimeResult},
 };
 
 pub struct Worker {
-    id: usize,
+    _id: usize,
     listener: Listener,
     coordinator: Rc<Coordinator>,
 }
 
 impl Worker {
-    pub fn new(id: usize, addr: SocketAddr, rx: MessageRx, peers: Vec<MessageTx>) -> Result<Self> {
-        let listener = match Listener::bind(addr, 128) {
-            Ok(listener) => listener,
-            Err(_) => {
-                return Err(RuntimeError::WorkerStartFailed {
-                    id,
-                    reason: "failed to bind listener socket".into(),
-                });
-            }
-        };
+    pub fn new(
+        id: usize,
+        addr: SocketAddr,
+        rx: MessageRx,
+        peers: Vec<MessageTx>,
+    ) -> RuntimeResult<Self> {
+        let listener = Listener::bind(addr, 128).map_err(|e| RuntimeError::WorkerStartFailed {
+            id,
+            reason: format!("failed to bind listener socket on {addr}: {e:?}"),
+        })?;
+
         let coordinator = Rc::new(Coordinator::new(id, rx, peers));
         Ok(Worker {
-            id,
+            _id: id,
             listener,
             coordinator,
         })

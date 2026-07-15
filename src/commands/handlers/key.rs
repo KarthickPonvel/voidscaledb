@@ -24,13 +24,26 @@ pub fn exec_ttl(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
     }
 }
 
-pub fn exec_del(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {
+pub fn exec_del(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
     if args.is_empty() {
         return Reply::Error(CommandError::WrongArity);
     }
     let mut count = 0;
     for key in args {
-        if shard.del(key) {
+        if shard_engine.del(key) {
+            count += 1;
+        }
+    }
+    Reply::Integer(count as i64)
+}
+
+pub fn exec_exists(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
+    if args.is_empty() {
+        return Reply::Error(CommandError::WrongArity);
+    }
+    let mut count = 0;
+    for key in args {
+        if shard_engine.exists(key) {
             count += 1;
         }
     }

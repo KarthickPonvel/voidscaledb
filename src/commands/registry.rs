@@ -6,7 +6,7 @@ use phf::phf_map;
 
 use crate::{
     commands::handlers::{
-        key::{exec_del, exec_ttl},
+        key::{exec_del, exec_exists, exec_ttl},
         server::exec_ping,
         string::{exec_get, exec_set},
     },
@@ -24,6 +24,7 @@ pub enum CommandId {
     Get,
     Del,
     Ttl,
+    Exists,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -69,5 +70,6 @@ pub static COMMANDS_TABLE: phf::Map<&'static [u8], CommandMeta> = phf_map! {
     b"GET"  => CommandMeta::new(CommandId::Get, 1, Some(1), false, exec_get, ExecutionPolicy::SingleKey),
     b"SET"  => CommandMeta::new(CommandId::Set, 2, Some(8), true, exec_set, ExecutionPolicy::SingleKey),
     b"DEL"  => CommandMeta::new(CommandId::Del, 1, None, true, exec_del, ExecutionPolicy::MultiKey),
+    b"EXISTS"  => CommandMeta::new(CommandId::Exists, 1, None, false, exec_exists, ExecutionPolicy::MultiKey),
     b"TTL"  => CommandMeta::new(CommandId::Ttl, 1, Some(1), false, exec_ttl, ExecutionPolicy::SingleKey),
 };

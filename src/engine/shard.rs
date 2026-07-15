@@ -70,6 +70,11 @@ impl ShardEngine {
         self.storage.del(key, now)
     }
 
+    pub fn exists(&mut self, key: &Bytes) -> bool {
+        let now = self.get_time();
+        self.storage.exists(key, now)
+    }
+
     pub fn ttl(&mut self, key: &Bytes) -> Option<Option<u64>> {
         let now = self.current_time_ms;
         self.storage.ttl(key, now)

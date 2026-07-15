@@ -23,4 +23,11 @@ impl StorageEngine {
             None => false,
         }
     }
+
+    pub fn exists(&self, key: &Bytes, now: u64) -> bool {
+        match self.keyspace.get(key) {
+            Some(r) => !r.is_expired(now),
+            None => false,
+        }
+    }
 }

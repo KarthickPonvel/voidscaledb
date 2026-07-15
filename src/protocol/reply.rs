@@ -12,7 +12,7 @@ pub enum CommandError {
     WrongType,
     Syntax,
     OutOfRange,
-    Custom(Bytes),
+    Internal,
 }
 
 #[derive(Debug, Clone)]
@@ -39,7 +39,7 @@ impl std::fmt::Display for CommandError {
             ),
             Self::Syntax => write!(f, "ERR syntax error"),
             Self::OutOfRange => write!(f, "ERR value out of range"),
-            Self::Custom(msg) => write!(f, "ERR {}", String::from_utf8_lossy(msg)),
+            Self::Internal => write!(f, "ERR internal server error"),
         }
     }
 }

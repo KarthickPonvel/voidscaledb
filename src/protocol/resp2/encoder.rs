@@ -76,11 +76,7 @@ fn encode_error(err: &CommandError, buf: &mut BytesMut) {
         }
         CommandError::OutOfRange => buf.put_slice(b"ERR value out of range\r\n"),
         CommandError::Syntax => buf.put_slice(b"ERR syntax error\r\n"),
-        CommandError::Custom(msg) => {
-            buf.put_slice(b"ERR ");
-            buf.put_slice(msg);
-            buf.put_slice(b"\r\n");
-        }
+        CommandError::Internal => buf.put_slice(b"ERR internal server error\r\n"),
     }
 }
 
@@ -213,10 +209,8 @@ mod tests {
     #[test]
     fn test_encode_error_custom() {
         assert_eq!(
-            check_encode(Reply::Error(CommandError::Custom(
-                b"something went wrong".to_vec().into()
-            ))),
-            "-ERR something went wrong\r\n"
+            check_encode(Reply::Error(CommandError::Internal)),
+            "-ERR internal server error\r\n"
         );
     }
 

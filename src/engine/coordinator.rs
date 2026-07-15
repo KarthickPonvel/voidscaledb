@@ -61,11 +61,11 @@ impl Coordinator {
         };
 
         if cmd.args.len() < meta.min {
-            return Reply::Error(CommandError::Custom("Internal error".into()));
+            return Reply::Error(CommandError::WrongArity);
         }
         if let Some(max) = meta.max {
             if cmd.args.len() > max {
-                return Reply::Error(CommandError::Custom("Internal error".into()));
+                return Reply::Error(CommandError::WrongArity);
             }
         }
 
@@ -102,12 +102,12 @@ impl Coordinator {
         };
 
         if self.outbound[worker].send(msg).await.is_err() {
-            return Reply::Error(CommandError::Custom("Internal error".into()));
+            return Reply::Error(CommandError::Internal);
         }
 
         reply_rx
             .await
-            .unwrap_or(Reply::Error(CommandError::Custom("Internal error".into())))
+            .unwrap_or(Reply::Error(CommandError::Internal))
     }
 
     async fn execute_multi_key(

@@ -2,11 +2,10 @@
 // Licensed under the Apache License, Version 2.0.
 
 mod error;
-mod key;
+mod ops;
 mod record;
 mod result;
 mod storage;
-mod strings;
 mod value;
 
 pub use error::{StorageError, StorageResult};

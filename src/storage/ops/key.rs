@@ -6,7 +6,7 @@ use bytes::Bytes;
 use crate::storage::StorageEngine;
 
 impl StorageEngine {
-    pub fn ttl(&mut self, key: &Bytes, now: u64) -> Option<Option<u64>> {
+    pub fn remaining_ttl(&mut self, key: &Bytes, now: u64) -> Option<Option<u64>> {
         match self.keyspace.get(key) {
             Some(r) if r.is_expired(now) => {
                 self.keyspace.remove(key);
@@ -17,14 +17,14 @@ impl StorageEngine {
         }
     }
 
-    pub fn del(&mut self, key: &Bytes, now: u64) -> bool {
+    pub fn delete(&mut self, key: &Bytes, now: u64) -> bool {
         match self.keyspace.remove(key) {
             Some(r) => !r.is_expired(now),
             None => false,
         }
     }
 
-    pub fn exists(&self, key: &Bytes, now: u64) -> bool {
+    pub fn contains(&self, key: &Bytes, now: u64) -> bool {
         match self.keyspace.get(key) {
             Some(r) => !r.is_expired(now),
             None => false,

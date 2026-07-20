@@ -15,7 +15,7 @@ use crate::{
 };
 
 impl StorageEngine {
-    pub fn str_get(&mut self, key: &Bytes, now: u64) -> StorageResult<Option<Bytes>> {
+    pub fn get_string(&mut self, key: &Bytes, now: u64) -> StorageResult<Option<Bytes>> {
         let record = match self.get_mut(key, now) {
             Some(record) => record,
             None => return Ok(None),
@@ -24,7 +24,7 @@ impl StorageEngine {
         Ok(Some(record.value.as_string()?.clone()))
     }
 
-    pub fn str_set(
+    pub fn set_string(
         &mut self,
         key: Bytes,
         value: Value,
@@ -70,7 +70,7 @@ impl StorageEngine {
         }
     }
 
-    pub fn str_incr_decr_by(&mut self, key: Bytes, by: i64, now: u64) -> StorageResult<i64> {
+    pub fn increment_string_by(&mut self, key: Bytes, by: i64, now: u64) -> StorageResult<i64> {
         match self.keyspace.entry(key) {
             Entry::Vacant(v) => {
                 v.insert(Record::new(Value::String(i64_to_bytes(by)), None));

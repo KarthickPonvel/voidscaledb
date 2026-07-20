@@ -53,7 +53,7 @@ impl ShardEngine {
 
     pub fn str_get(&mut self, key: &Bytes) -> StorageResult<Option<Bytes>> {
         let now = self.get_time();
-        self.storage.str_get(key, now)
+        self.storage.get_string(key, now)
     }
 
     pub fn str_set(
@@ -62,25 +62,26 @@ impl ShardEngine {
         value: Value,
         options: SetOptions,
     ) -> StorageResult<WriteOutcome<Option<Bytes>>> {
-        self.storage.str_set(key, value, options, self.get_time())
+        self.storage
+            .set_string(key, value, options, self.get_time())
     }
 
     pub fn str_incr_decr_by(&mut self, key: Bytes, by: i64) -> StorageResult<i64> {
-        self.storage.str_incr_decr_by(key, by, self.get_time())
+        self.storage.increment_string_by(key, by, self.get_time())
     }
 
     pub fn del(&mut self, key: &Bytes) -> bool {
         let now = self.get_time();
-        self.storage.del(key, now)
+        self.storage.delete(key, now)
     }
 
     pub fn exists(&mut self, key: &Bytes) -> bool {
         let now = self.get_time();
-        self.storage.exists(key, now)
+        self.storage.contains(key, now)
     }
 
     pub fn ttl(&mut self, key: &Bytes) -> Option<Option<u64>> {
         let now = self.current_time_ms;
-        self.storage.ttl(key, now)
+        self.storage.remaining_ttl(key, now)
     }
 }

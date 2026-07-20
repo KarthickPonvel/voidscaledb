@@ -5,7 +5,7 @@ use bytes::Bytes;
 use phf::phf_map;
 
 use crate::{
-    commands::handlers::{
+    commands::exec::{
         key::{exec_del, exec_exists, exec_ttl},
         server::exec_ping,
         string::{

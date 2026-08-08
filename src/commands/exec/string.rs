@@ -7,7 +7,7 @@ use crate::{
     commands::options::SetOptions,
     engine::shard::ShardEngine,
     protocol::reply::{CommandError, Reply},
-    storage::{Value, WriteOutcome},
+    storage::{StorageError, Value, WriteOutcome},
     util::{bytes_to_i64, bytes_to_u64},
 };
 
@@ -98,6 +98,44 @@ pub fn exec_get(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {
         Ok(None) => Reply::Null,
         Err(e) => Reply::Error(e.into()),
     }
+}
+
+pub fn exec_mset(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {
+    if args.len() % 2 == 1 {
+        return Reply::Error(CommandError::WrongArity);
+    }
+
+    let len = args.len();
+    let mut idx = 0;
+    while idx + 1 < len {
+        let key = args[idx].clone();
+        let value = args[idx + 1].clone();
+        let _ = shard.set(key, Value::String(value));
+        idx += 2;
+    }
+    Reply::Ok
+}
+
+pub fn exec_mget(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {
+    if args.is_empty() {
+        return Reply::Error(CommandError::WrongArity);
+    }
+    let mut replies = Vec::<Reply>::new();
+    for key in args {
+        match shard.str_get(key) {
+            Ok(Some(v)) => replies.push(Reply::Bulk(v)),
+            Ok(None) => {
+                replies.push(Reply::Null);
+            }
+            Err(StorageError::WrongType) => {
+                replies.push(Reply::Null);
+            }
+            Err(_) => {
+                replies.push(Reply::Error(CommandError::Internal));
+            }
+        };
+    }
+    Reply::Array(replies)
 }
 
 pub fn exec_str_incr(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {

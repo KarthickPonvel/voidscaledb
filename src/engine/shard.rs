@@ -56,6 +56,11 @@ impl ShardEngine {
         self.storage.get_string(key, now)
     }
 
+    pub fn set(&mut self, key: Bytes, value: Value) -> StorageResult<()> {
+        self.storage.set_string_without_option(key, value);
+        Ok(())
+    }
+
     pub fn str_set(
         &mut self,
         key: Bytes,

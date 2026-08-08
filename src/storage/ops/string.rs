@@ -24,6 +24,16 @@ impl StorageEngine {
         Ok(Some(record.value.as_string()?.clone()))
     }
 
+    pub fn set_string_without_option(&mut self, key: Bytes, value: Value) {
+        self.keyspace.insert(
+            key,
+            Record {
+                value,
+                expire_at: None,
+            },
+        );
+    }
+
     pub fn set_string(
         &mut self,
         key: Bytes,

@@ -453,3 +453,150 @@ fn incr_bounds_overflow() {
     let r: redis::RedisResult<i64> = redis::cmd("INCR").arg(&k).query(&mut con);
     assert!(r.is_err());
 }
+
+fn mset(con: &mut redis::Connection, pairs: &[(&str, &str)]) {
+    let mut cmd = redis::cmd("MSET");
+    for (k, v) in pairs {
+        cmd.arg(*k).arg(*v);
+    }
+    cmd.query::<()>(con).unwrap();
+}
+
+fn mget(con: &mut redis::Connection, keys: &[&str]) -> Vec<Option<String>> {
+    let mut cmd = redis::cmd("MGET");
+    for k in keys {
+        cmd.arg(*k);
+    }
+    cmd.query(con).unwrap()
+}
+
+#[test]
+fn mset_basic() {
+    let mut con = connect();
+    let k1 = key("mset1");
+    let k2 = key("mset2");
+
+    mset(&mut con, &[(&k1, "a"), (&k2, "b")]);
+
+    assert_eq!(get(&mut con, &k1), Some("a".into()));
+    assert_eq!(get(&mut con, &k2), Some("b".into()));
+}
+
+#[test]
+fn mset_overwrite() {
+    let mut con = connect();
+    let k1 = key("msetovr1");
+    let k2 = key("msetovr2");
+
+    set(&mut con, &k1, "old1");
+    set(&mut con, &k2, "old2");
+
+    mset(&mut con, &[(&k1, "new1"), (&k2, "new2")]);
+
+    assert_eq!(get(&mut con, &k1), Some("new1".into()));
+    assert_eq!(get(&mut con, &k2), Some("new2".into()));
+}
+
+#[test]
+fn mset_single_pair() {
+    let mut con = connect();
+    let k = key("msetsingle");
+
+    mset(&mut con, &[(&k, "only")]);
+
+    assert_eq!(get(&mut con, &k), Some("only".into()));
+}
+
+#[test]
+fn mset_wrong_arity() {
+    let mut con = connect();
+    let k = key("msetarity");
+
+    let res: redis::RedisResult<()> = redis::cmd("MSET").arg(&k).query(&mut con);
+
+    assert!(res.is_err());
+}
+
+#[test]
+fn mget_basic() {
+    let mut con = connect();
+    let k1 = key("mget1");
+    let k2 = key("mget2");
+
+    set(&mut con, &k1, "a");
+    set(&mut con, &k2, "b");
+
+    let res = mget(&mut con, &[&k1, &k2]);
+
+    assert_eq!(res, vec![Some("a".into()), Some("b".into())]);
+}
+
+#[test]
+fn mget_missing_keys() {
+    let mut con = connect();
+    let k1 = key("mgetmiss1");
+    let k2 = key("mgetmiss2");
+
+    set(&mut con, &k1, "a");
+
+    let res = mget(&mut con, &[&k1, &k2]);
+
+    assert_eq!(res, vec![Some("a".into()), None]);
+}
+
+#[test]
+fn mget_all_missing() {
+    let mut con = connect();
+    let k1 = key("mgetallmiss1");
+    let k2 = key("mgetallmiss2");
+
+    let res = mget(&mut con, &[&k1, &k2]);
+
+    assert_eq!(res, vec![None, None]);
+}
+
+#[test]
+fn mget_single_key() {
+    let mut con = connect();
+    let k = key("mgetsingle");
+
+    set(&mut con, &k, "solo");
+
+    let res = mget(&mut con, &[&k]);
+
+    assert_eq!(res, vec![Some("solo".into())]);
+}
+
+#[test]
+fn mget_duplicate_keys() {
+    let mut con = connect();
+    let k = key("mgetdup");
+
+    set(&mut con, &k, "dup");
+
+    let res = mget(&mut con, &[&k, &k]);
+
+    assert_eq!(res, vec![Some("dup".into()), Some("dup".into())]);
+}
+
+#[test]
+fn mget_after_expiry() {
+    let mut con = connect();
+    let k1 = key("mgetexp1");
+    let k2 = key("mgetexp2");
+
+    redis::cmd("SET")
+        .arg(&k1)
+        .arg("v")
+        .arg("EX")
+        .arg(1)
+        .query::<()>(&mut con)
+        .unwrap();
+    set(&mut con, &k2, "still here");
+
+    thread::sleep(Duration::from_secs(2));
+
+    let res = mget(&mut con, &[&k1, &k2]);
+
+    assert_eq!(res, vec![None, Some("still here".into())]);
+}

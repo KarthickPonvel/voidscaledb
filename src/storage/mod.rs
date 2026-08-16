@@ -4,12 +4,12 @@
 mod error;
 mod ops;
 mod record;
-mod result;
 mod storage;
 mod value;
 
 pub use error::{StorageError, StorageResult};
+pub use ops::key::KeyOps;
+pub use ops::string::StringOps;
 pub use record::Record;
-pub use result::WriteOutcome;
 pub use storage::StorageEngine;
 pub use value::Value;

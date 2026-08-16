@@ -6,108 +6,71 @@ use std::collections::hash_map::Entry;
 use bytes::Bytes;
 
 use crate::{
-    commands::options::SetOptions,
-    storage::{
-        StorageEngine, StorageError, WriteOutcome, error::StorageResult, record::Record,
-        value::Value,
-    },
+    storage::{StorageEngine, StorageResult, error::StorageError, record::Record, value::Value},
     util::{bytes_to_i64, i64_to_bytes},
 };
 
-impl StorageEngine {
-    pub fn get_string(&mut self, key: &Bytes, now: u64) -> StorageResult<Option<Bytes>> {
-        let record = match self.get_mut(key, now) {
-            Some(record) => record,
-            None => return Ok(None),
-        };
+pub trait StringOps {
+    fn get(&mut self, key: &Bytes, now: u64) -> StorageResult<Option<Bytes>>;
 
-        Ok(Some(record.value.as_string()?.clone()))
-    }
-
-    pub fn set_string_without_option(&mut self, key: Bytes, value: Value) {
-        self.keyspace.insert(
-            key,
-            Record {
-                value,
-                expire_at: None,
-            },
-        );
-    }
-
-    pub fn set_string(
+    fn set(
         &mut self,
         key: Bytes,
-        value: Value,
-        options: SetOptions,
+        value: Bytes,
+        expire_at: Option<u64>,
         now: u64,
-    ) -> StorageResult<WriteOutcome<Option<Bytes>>> {
-        match self.keyspace.entry(key) {
+    ) -> StorageResult<Option<Bytes>>;
+
+    fn incr_by(&mut self, key: Bytes, by: i64, now: u64) -> StorageResult<i64>;
+}
+
+impl StringOps for StorageEngine {
+    fn get(&mut self, key: &Bytes, now: u64) -> StorageResult<Option<Bytes>> {
+        match self.peek_live(key, now) {
+            Some(record) => Ok(Some(record.value.as_string()?.clone())),
+            None => Ok(None),
+        }
+    }
+
+    fn set(
+        &mut self,
+        key: Bytes,
+        value: Bytes,
+        expire_at: Option<u64>,
+        now: u64,
+    ) -> StorageResult<Option<Bytes>> {
+        match self.live_entry(key, now) {
             Entry::Vacant(v) => {
-                if options.xx {
-                    return Ok(WriteOutcome::Rejected(None));
-                }
-                v.insert(Record::new(value, options.expires_at));
-                Ok(WriteOutcome::Applied(None))
+                v.insert(Record::new(Value::String(value), expire_at));
+                Ok(None)
             }
             Entry::Occupied(mut o) => {
-                if o.get().is_expired(now) {
-                    if options.xx {
-                        o.remove();
-                        return Ok(WriteOutcome::Rejected(None));
-                    }
-                    o.insert(Record::new(value, options.expires_at));
-                    return Ok(WriteOutcome::Applied(None));
-                }
-
                 let record = o.get_mut();
                 let old = record.value.as_string()?.clone();
 
-                if options.nx {
-                    return Ok(WriteOutcome::Rejected(Some(old)));
-                }
-
-                let expire_at = if options.keep_ttl {
-                    record.expire_at
-                } else {
-                    options.expires_at
-                };
-
-                record.value = value;
+                record.value = Value::String(value);
                 record.expire_at = expire_at;
 
-                Ok(WriteOutcome::Applied(Some(old)))
+                Ok(Some(old))
             }
         }
     }
 
-    pub fn increment_string_by(&mut self, key: Bytes, by: i64, now: u64) -> StorageResult<i64> {
-        match self.keyspace.entry(key) {
+    fn incr_by(&mut self, key: Bytes, by: i64, now: u64) -> StorageResult<i64> {
+        match self.live_entry(key, now) {
             Entry::Vacant(v) => {
                 v.insert(Record::new(Value::String(i64_to_bytes(by)), None));
                 Ok(by)
             }
             Entry::Occupied(mut o) => {
-                if o.get().is_expired(now) {
-                    o.insert(Record::new(Value::String(i64_to_bytes(by)), None));
-                    return Ok(by);
-                }
                 let record = o.get_mut();
-
                 let old_val = record.value.as_string()?;
 
-                let old_int = match bytes_to_i64(old_val) {
-                    Some(val) => val,
-                    None => return Err(StorageError::OutOfRange),
-                };
-
-                let new_int = match old_int.checked_add(by) {
-                    Some(val) => val,
-                    None => return Err(StorageError::OutOfRange),
-                };
+                let old_int = bytes_to_i64(old_val).ok_or(StorageError::OutOfRange)?;
+                let new_int = old_int.checked_add(by).ok_or(StorageError::OutOfRange)?;
 
                 record.value = Value::String(i64_to_bytes(new_int));
-
-                return Ok(new_int);
+                Ok(new_int)
             }
         }
     }

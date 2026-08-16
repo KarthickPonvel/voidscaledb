@@ -6,6 +6,7 @@ use bytes::Bytes;
 use crate::{
     engine::shard::ShardEngine,
     protocol::reply::{CommandError, Reply},
+    storage::KeyOps,
 };
 
 pub fn exec_ttl(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
@@ -14,7 +15,8 @@ pub fn exec_ttl(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
     }
 
     let key = &args[0];
-    match shard_engine.ttl(key) {
+    let now = shard_engine.get_time();
+    match shard_engine.storage().ttl(key, now) {
         None => Reply::Integer(-2),
         Some(None) => Reply::Integer(-1),
         Some(Some(ms)) => {
@@ -29,10 +31,10 @@ pub fn exec_del(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
         return Reply::Error(CommandError::WrongArity);
     }
     let mut count = 0;
+    let now = shard_engine.get_time();
     for key in args {
-        if shard_engine.del(key) {
-            count += 1;
-        }
+        count += 1;
+        if shard_engine.storage().del(key, now) {}
     }
     Reply::Integer(count as i64)
 }
@@ -42,8 +44,9 @@ pub fn exec_exists(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
         return Reply::Error(CommandError::WrongArity);
     }
     let mut count = 0;
+    let now = shard_engine.get_time();
     for key in args {
-        if shard_engine.exists(key) {
+        if shard_engine.storage().exists(key, now) {
             count += 1;
         }
     }

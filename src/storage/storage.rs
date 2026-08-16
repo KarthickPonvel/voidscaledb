@@ -9,7 +9,7 @@ use bytes::Bytes;
 use crate::storage::record::Record;
 
 pub struct StorageEngine {
-    pub keyspace: AHashMap<Bytes, Record>,
+    keyspace: AHashMap<Bytes, Record>,
 }
 
 impl StorageEngine {
@@ -19,17 +19,32 @@ impl StorageEngine {
         }
     }
 
-    pub(crate) fn get_mut(&mut self, key: &Bytes, now: u64) -> Option<&mut Record> {
-        match self.keyspace.entry(key.clone()) {
-            Entry::Occupied(entry) => {
-                if entry.get().is_expired(now) {
-                    entry.remove();
-                    None
-                } else {
-                    Some(entry.into_mut())
-                }
+    fn evict_if_expired(&mut self, key: &Bytes, now: u64) {
+        match self.keyspace.get(key) {
+            Some(r) if r.is_expired(now) => {
+                self.keyspace.remove(key);
             }
-            Entry::Vacant(_) => None,
-        }
+            _ => (),
+        };
+    }
+
+    pub(crate) fn peek_live(&mut self, key: &Bytes, now: u64) -> Option<&Record> {
+        self.evict_if_expired(key, now);
+        self.keyspace.get(key)
+    }
+
+    pub(crate) fn peek_live_mut(&mut self, key: &Bytes, now: u64) -> Option<&mut Record> {
+        self.evict_if_expired(key, now);
+        self.keyspace.get_mut(key)
+    }
+
+    pub(crate) fn take_if_live(&mut self, key: &Bytes, now: u64) -> Option<Record> {
+        self.evict_if_expired(key, now);
+        self.keyspace.remove(key)
+    }
+
+    pub(crate) fn live_entry(&mut self, key: Bytes, now: u64) -> Entry<'_, Bytes, Record> {
+        self.evict_if_expired(&key, now);
+        self.keyspace.entry(key)
     }
 }

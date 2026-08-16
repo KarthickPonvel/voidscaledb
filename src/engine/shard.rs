@@ -6,11 +6,7 @@ use std::time::SystemTime;
 use bytes::Bytes;
 use smallvec::SmallVec;
 
-use crate::{
-    commands::{options::SetOptions, registry::CommandMeta},
-    protocol::reply::Reply,
-    storage::{StorageEngine, StorageResult, Value, WriteOutcome},
-};
+use crate::{commands::registry::CommandMeta, protocol::reply::Reply, storage::StorageEngine};
 
 pub struct ShardEngine {
     storage: StorageEngine,
@@ -37,6 +33,10 @@ impl ShardEngine {
         (meta.handler)(self, &args)
     }
 
+    pub fn storage(&mut self) -> &mut StorageEngine {
+        &mut self.storage
+    }
+
     pub fn update_time(&mut self) -> u64 {
         let now = SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -49,44 +49,5 @@ impl ShardEngine {
 
     pub fn get_time(&self) -> u64 {
         self.current_time_ms
-    }
-
-    pub fn str_get(&mut self, key: &Bytes) -> StorageResult<Option<Bytes>> {
-        let now = self.get_time();
-        self.storage.get_string(key, now)
-    }
-
-    pub fn set(&mut self, key: Bytes, value: Value) -> StorageResult<()> {
-        self.storage.set_string_without_option(key, value);
-        Ok(())
-    }
-
-    pub fn str_set(
-        &mut self,
-        key: Bytes,
-        value: Value,
-        options: SetOptions,
-    ) -> StorageResult<WriteOutcome<Option<Bytes>>> {
-        self.storage
-            .set_string(key, value, options, self.get_time())
-    }
-
-    pub fn str_incr_decr_by(&mut self, key: Bytes, by: i64) -> StorageResult<i64> {
-        self.storage.increment_string_by(key, by, self.get_time())
-    }
-
-    pub fn del(&mut self, key: &Bytes) -> bool {
-        let now = self.get_time();
-        self.storage.delete(key, now)
-    }
-
-    pub fn exists(&mut self, key: &Bytes) -> bool {
-        let now = self.get_time();
-        self.storage.contains(key, now)
-    }
-
-    pub fn ttl(&mut self, key: &Bytes) -> Option<Option<u64>> {
-        let now = self.current_time_ms;
-        self.storage.remaining_ttl(key, now)
     }
 }

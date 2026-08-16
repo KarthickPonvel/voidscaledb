@@ -5,29 +5,25 @@ use bytes::Bytes;
 
 use crate::storage::StorageEngine;
 
-impl StorageEngine {
-    pub fn remaining_ttl(&mut self, key: &Bytes, now: u64) -> Option<Option<u64>> {
-        match self.keyspace.get(key) {
-            Some(r) if r.is_expired(now) => {
-                self.keyspace.remove(key);
-                None
-            }
-            Some(r) => Some(r.expire_at.map(|at| at.saturating_sub(now))),
-            None => None,
-        }
+pub trait KeyOps {
+    fn del(&mut self, key: &Bytes, now: u64) -> bool;
+
+    fn exists(&mut self, key: &Bytes, now: u64) -> bool;
+
+    fn ttl(&mut self, key: &Bytes, now: u64) -> Option<Option<u64>>;
+}
+
+impl KeyOps for StorageEngine {
+    fn del(&mut self, key: &Bytes, now: u64) -> bool {
+        self.take_if_live(key, now).is_some()
     }
 
-    pub fn delete(&mut self, key: &Bytes, now: u64) -> bool {
-        match self.keyspace.remove(key) {
-            Some(r) => !r.is_expired(now),
-            None => false,
-        }
+    fn exists(&mut self, key: &Bytes, now: u64) -> bool {
+        self.peek_live(key, now).is_some()
     }
 
-    pub fn contains(&self, key: &Bytes, now: u64) -> bool {
-        match self.keyspace.get(key) {
-            Some(r) => !r.is_expired(now),
-            None => false,
-        }
+    fn ttl(&mut self, key: &Bytes, now: u64) -> Option<Option<u64>> {
+        self.peek_live(key, now)
+            .map(|record| record.expire_at.map(|at| at.saturating_sub(now)))
     }
 }

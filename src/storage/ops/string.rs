@@ -3,7 +3,7 @@
 
 use std::collections::hash_map::Entry;
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 
 use crate::{
     storage::{StorageEngine, StorageResult, error::StorageError, record::Record, value::Value},
@@ -20,6 +20,8 @@ pub trait StringOps {
         expire_at: Option<u64>,
         now: u64,
     ) -> StorageResult<Option<Bytes>>;
+
+    fn append(&mut self, key: Bytes, value: Bytes, now: u64) -> StorageResult<usize>;
 
     fn incr_by(&mut self, key: Bytes, by: i64, now: u64) -> StorageResult<i64>;
 }
@@ -52,6 +54,30 @@ impl StringOps for StorageEngine {
                 record.expire_at = expire_at;
 
                 Ok(Some(old))
+            }
+        }
+    }
+
+    fn append(&mut self, key: Bytes, value: Bytes, now: u64) -> StorageResult<usize> {
+        match self.live_entry(key, now) {
+            Entry::Vacant(v) => {
+                v.insert(Record::new(Value::String(value.clone()), None));
+                Ok(value.len())
+            }
+            Entry::Occupied(mut o) => {
+                let record = o.get_mut();
+                let old_val = record.value.as_string()?;
+
+                // TODO: Remove allocation
+                let mut temp = BytesMut::from(old_val.clone());
+                temp.extend_from_slice(&value);
+
+                let len = temp.len();
+
+                let new_val = temp.freeze();
+
+                record.value = Value::String(new_val);
+                Ok(len)
             }
         }
     }

@@ -600,3 +600,98 @@ fn mget_after_expiry() {
 
     assert_eq!(res, vec![None, Some("still here".into())]);
 }
+
+fn append(con: &mut redis::Connection, key: &str, value: &str) -> i64 {
+    redis::cmd("APPEND").arg(key).arg(value).query(con).unwrap()
+}
+
+#[test]
+fn append_creates_key() {
+    let mut con = connect();
+    let k = key("append_new");
+
+    let len = append(&mut con, &k, "hello");
+
+    assert_eq!(len, 5);
+    assert_eq!(get(&mut con, &k), Some("hello".into()));
+}
+
+#[test]
+fn append_to_existing() {
+    let mut con = connect();
+    let k = key("append_existing");
+
+    set(&mut con, &k, "hello");
+
+    let len = append(&mut con, &k, " world");
+
+    assert_eq!(len, 11);
+    assert_eq!(get(&mut con, &k), Some("hello world".into()));
+}
+
+#[test]
+fn append_empty_value() {
+    let mut con = connect();
+    let k = key("append_empty");
+
+    set(&mut con, &k, "abc");
+
+    let len = append(&mut con, &k, "");
+
+    assert_eq!(len, 3);
+    assert_eq!(get(&mut con, &k), Some("abc".into()));
+}
+
+#[test]
+fn append_empty_value_on_missing_key() {
+    let mut con = connect();
+    let k = key("append_empty_missing");
+
+    let len = append(&mut con, &k, "");
+
+    assert_eq!(len, 0);
+    assert_eq!(get(&mut con, &k), Some("".into()));
+}
+
+#[test]
+fn append_multiple_times() {
+    let mut con = connect();
+    let k = key("append_multi");
+
+    assert_eq!(append(&mut con, &k, "a"), 1);
+    assert_eq!(append(&mut con, &k, "b"), 2);
+    assert_eq!(append(&mut con, &k, "c"), 3);
+
+    assert_eq!(get(&mut con, &k), Some("abc".into()));
+}
+
+#[test]
+fn append_after_expiry() {
+    let mut con = connect();
+    let k = key("append_exp");
+
+    redis::cmd("SET")
+        .arg(&k)
+        .arg("old")
+        .arg("EX")
+        .arg(1)
+        .query::<()>(&mut con)
+        .unwrap();
+
+    thread::sleep(Duration::from_secs(2));
+
+    let len = append(&mut con, &k, "new");
+
+    assert_eq!(len, 3);
+    assert_eq!(get(&mut con, &k), Some("new".into()));
+}
+
+#[test]
+fn append_wrong_arity() {
+    let mut con = connect();
+    let k = key("append_arity");
+
+    let res: redis::RedisResult<i64> = redis::cmd("APPEND").arg(&k).query(&mut con);
+
+    assert!(res.is_err());
+}

@@ -33,8 +33,9 @@ pub fn exec_del(shard_engine: &mut ShardEngine, args: &[Bytes]) -> Reply {
     let mut count = 0;
     let now = shard_engine.get_time();
     for key in args {
-        count += 1;
-        if shard_engine.storage().del(key, now) {}
+        if shard_engine.storage().del(key, now) {
+            count += 1;
+        }
     }
     Reply::Integer(count as i64)
 }

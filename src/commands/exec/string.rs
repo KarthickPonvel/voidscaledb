@@ -66,6 +66,20 @@ pub fn exec_set(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {
     }
 }
 
+pub fn exec_append(shard: &mut ShardEngine, args: &[Bytes]) -> Reply {
+    if args.len() != 2 {
+        return Reply::Error(CommandError::WrongArity);
+    }
+    let now = shard.get_time();
+    match shard
+        .storage()
+        .append(args[0].clone(), args[1].clone(), now)
+    {
+        Ok(len) => Reply::Integer(len as i64),
+        Err(e) => Reply::Error(e.into()),
+    }
+}
+
 fn no_write_reply(shard: &mut ShardEngine, key: &Bytes, now: u64, get: bool) -> Reply {
     if !get {
         return Reply::Null;

@@ -9,7 +9,7 @@ use crate::{
         key::{exec_del, exec_exists, exec_ttl},
         server::exec_ping,
         string::{
-            exec_get, exec_mget, exec_mset, exec_set, exec_str_decr, exec_str_decr_by,
+            exec_append, exec_get, exec_mget, exec_mset, exec_set, exec_str_decr, exec_str_decr_by,
             exec_str_incr, exec_str_incr_by,
         },
     },
@@ -25,6 +25,7 @@ pub enum CommandId {
     Ping,
     Set,
     Get,
+    Append,
     Mset,
     Mget,
     Del,
@@ -126,6 +127,10 @@ pub static COMMANDS_TABLE: phf::Map<&'static [u8], CommandMeta> = phf_map! {
     b"SET"  => CommandMeta::new(
         CommandId::Set, 2, Some(8), true, exec_set,
         ExecutionPolicy::SingleKey, ArgumentKind::SingleKey, ReplyKind::Ok, ReplyMergePolicy::None
+    ),
+    b"APPEND" => CommandMeta::new(
+        CommandId::Append, 2, Some(2), true, exec_append,
+        ExecutionPolicy::SingleKey, ArgumentKind::SingleKey, ReplyKind::Integer, ReplyMergePolicy::None
     ),
     b"MSET" =>CommandMeta::new(
         CommandId::Mset, 2, None, true, exec_mset,
